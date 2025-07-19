@@ -1,6 +1,7 @@
 # using density channel ±1 HS transformation
 
-mutable struct _Hubbard_Para
+# mutable
+struct _Hubbard_Para
     Lattice::String
     t::Float64
     U::Float64
@@ -76,6 +77,3 @@ function setμ(model::_Hubbard_Para,μ)
     model.Pt=V[:,1:N_particle]
 end
 
-# function setNN_hopping(t)
-    
-# end

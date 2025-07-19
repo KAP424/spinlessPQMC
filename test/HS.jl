@@ -4,20 +4,76 @@ using DelimitedFiles
 using KAPDQMC_spinless
 using LinearAlgebra
 using Random
+rng=MersenneTwister(1)
 
-
-t=1;   Lattice="HoneyComb"    
-V=0;     Δt=0.1;     Θ=1.2;
+t=1;   Lattice="SQUARE"    
+U=1;     Δt=0.1;     Θ=0.3;
 BatchSize=10;
   
 
-L=12
+L=4
 site=[L,L]
 
-model=Hubbard_Para(t,V,Lattice,site,Δt,Θ,BatchSize,"V")
+model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
 
-D=zeros(model.Ns)
+# --------------------------------
+# TEST for nn2idx
+# for i in 1:18
+#     print(i)
+#     println(nn2idx(Lattice,site,i))
+# end
 
+# K=K_Matrix(Lattice,site)
+# print(K)
+# --------------------------------
+
+
+# --------------------------------
+# TEST for Green function
+s=Initial_s(model,rng)
+
+# τ=model.Nt
+# G=Gτ(model,s,div(model.Nt,2))
+# Gt,G0,Gt0,G0t=G4(model,s,τ,div(model.Nt,2))
+# Gt0_,G0t_=G12FF(model,s,τ,div(model.Nt,2))
+# println(norm(Gt0-Gt0_),',',norm(G0t-G0t_))
+# Gt_=Gτ(model,s,τ)
+# G0_=Gτ(model,s,div(model.Nt,2))
+# println(norm(Gt-Gt_),',',norm(G0-G0_))
+# --------------------------------
+
+
+# --------------------------------
+# TEST for phy_update
+path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
+s=phy_update(path,model,1,s)
+
+lt=2
+x=1
+y=1
+G=Gτ(model,s,lt)
+
+xidx=2*x-1
+yidx=findall(model.K[xidx,:].!=0)[y]
+Δ=diagm(exp.( 2*model.α.*[-s[lt,x,y],s[lt,x,y]] ))-I(2)
+subidx=[xidx,yidx]
+# r=1+tr(Δ*(I(2)-G[subidx,subidx]) )
+r=det( I(2)+Δ*(I(2)-G[subidx,subidx]) )
+G=G-(G[:,subidx]*Δ*(I(model.Ns)-G)[subidx,:])./( 1+tr(Δ*(I(2)-G[subidx,subidx]) ) )
+
+ss=s[:,:,:]
+ss[lt,x,y]=-ss[lt,x,y]
+
+GG=Gτ(model,ss,lt)
+println(findall(model.K[xidx,:].!=0))
+println(r-Poss(model,ss)/Poss(model,s))
+println(norm(G-GG))
+
+A=diagm([0,1,0,-1,0])
+B=reshape(collect(1:25),5,5)
+A*B
+
+collect(1:2:4)
 # # Half
 # indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
 # # println(indexA)

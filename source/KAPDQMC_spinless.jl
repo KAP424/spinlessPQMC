@@ -8,7 +8,7 @@ module KAPDQMC_spinless
     using Statistics
 
     include("Geometry.jl")
-    export K_Matrix,xy_i,i_xy,area_index
+    export K_Matrix,xy_i,i_xy,area_index,nn2idx
 
     include("Hubbard_model.jl")
     export Hubbard_Para,_Hubbard_Para,setμ
@@ -20,7 +20,7 @@ module KAPDQMC_spinless
     # export EK,NN,Magnetism,CzzofSpin
 
     include("phy_update.jl")
-    export phy_update
+    export phy_update,Poss
 
     # include("EE_update.jl")
     # export ctrl_EEicr,EE_dir,EEICR
