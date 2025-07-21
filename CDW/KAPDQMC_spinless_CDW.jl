@@ -1,16 +1,15 @@
 # H=∑_{<ij>}c_i c_j^† +∑_{<ij>} n_i n_j
-
-module KAPDQMC_spinless
+module KAPDQMC_spinless_CDW
     using Base.Filesystem
     using LinearAlgebra
     using DelimitedFiles
     using Random
     using Statistics
 
-    include("Geometry.jl")
+    include("../source/Geometry.jl")
     export K_Matrix,xy_i,i_xy,area_index,nn2idx
 
-    include("Hubbard_model.jl")
+    include("../source/Hubbard_model.jl")
     export Hubbard_Para,_Hubbard_Para,setμ
 
     include("GreenMatrix.jl")
