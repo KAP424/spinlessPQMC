@@ -1,4 +1,4 @@
-push!(LOAD_PATH,"E:/桌面/JuliaDQMC/code/spinlessPQMC/source/")
+push!(LOAD_PATH,"E:/桌面/JuliaDQMC/code/spinlessPQMC/Majorana/")
 using DelimitedFiles
 
 using KAPDQMC_spinless
