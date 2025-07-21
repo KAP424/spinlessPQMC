@@ -65,15 +65,15 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
 end
 
 
-function setμ(model::_Hubbard_Para,μ)
-    # fig1:1d
-    # km=abs(acos(μ/2))
-    # N_particle=Int(round(km/π*model.Ns))
+# function setμ(model::_Hubbard_Para,μ)
+#     # fig1:1d
+#     # km=abs(acos(μ/2))
+#     # N_particle=Int(round(km/π*model.Ns))
     
-    # fig2:2d-circle Fermi surface
-    N_particle=Int(round( μ^2/4/π *model.Ns ))
+#     # fig2:2d-circle Fermi surface
+#     N_particle=Int(round( μ^2/4/π *model.Ns ))
     
-    E,V=eigen(model.K)
-    model.Pt=V[:,1:N_particle]
-end
+#     E,V=eigen(model.K)
+#     model.Pt=V[:,1:N_particle]
+# end
 

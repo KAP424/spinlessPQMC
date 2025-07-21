@@ -30,11 +30,12 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
     counter=0
     for i in model.Nt:-1:τ+1
         D=zeros(model.Ns)
-        for j in 1:2:model.Ns
-            nnidx=findall(model.K[j,:].!=0)
-            for k in eachindex(nnidx)
-                D[j]+=s[i,Int(ceil(j/2)),k]
-                D[k]-=s[i,Int(ceil(j/2)),k]
+        for x in 1:size(s)[2]
+            xidx=2*x-1
+            nnidx=findall(model.K[xidx,:].!=0)
+            for k in 1:size(s)[3]
+                D[xidx]+=s[i,x,k]
+                D[nnidx[k]]-=s[i,x,k]
             end
         end
         BL=BL*diagm(exp.(model.α.*D))*model.eK
@@ -47,11 +48,12 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
     counter=0
     for i in 1:1:τ
         D=zeros(model.Ns)
-        for j in 1:2:model.Ns
-            nnidx=findall(model.K[j,:].!=0)
-            for k in eachindex(nnidx)
-                D[j]+=s[i,Int(ceil(j/2)),k]
-                D[k]-=s[i,Int(ceil(j/2)),k]
+        for x in 1:size(s)[2]
+            xidx=2*x-1
+            nnidx=findall(model.K[xidx,:].!=0)
+            for k in 1:size(s)[3]
+                D[xidx]+=s[i,x,k]
+                D[nnidx[k]]-=s[i,x,k]
             end
         end
         BR=diagm(exp.(model.α.*D))*model.eK*BR

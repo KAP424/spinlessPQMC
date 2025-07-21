@@ -6,17 +6,24 @@ using LinearAlgebra
 using Random
 rng=MersenneTwister(1)
 
-t=1;   Lattice="SQUARE"    
-U=1;     Δt=0.1;     Θ=0.3;
+t=1;   Lattice="HoneyComb"    
+U=8;     Δt=0.1;     Θ=0.5;
 BatchSize=10;
   
 
-L=4
+L=3
 site=[L,L]
 
 model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
 
-# --------------------------------
+# for x in 1:size(s)[2]
+#     xidx=2*x-1
+#     println(findall(model.K[xidx,:].!=0))
+# end
+
+# findall(model.K[1,:].!=0)
+
+# ------------------------------------------------------------------------
 # TEST for nn2idx
 # for i in 1:18
 #     print(i)
@@ -25,10 +32,10 @@ model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
 
 # K=K_Matrix(Lattice,site)
 # print(K)
-# --------------------------------
+# ------------------------------------------------------------------------
 
 
-# --------------------------------
+# ------------------------------------------------------------------------
 # TEST for Green function
 s=Initial_s(model,rng)
 
@@ -40,40 +47,34 @@ s=Initial_s(model,rng)
 # Gt_=Gτ(model,s,τ)
 # G0_=Gτ(model,s,div(model.Nt,2))
 # println(norm(Gt-Gt_),',',norm(G0-G0_))
-# --------------------------------
+# ------------------------------------------------------------------------
 
 
-# --------------------------------
+# ------------------------------------------------------------------------
 # TEST for phy_update
 path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
-s=phy_update(path,model,1,s)
+s=phy_update(path,model,s,1,false)
 
-lt=2
-x=1
-y=1
-G=Gτ(model,s,lt)
+# lt=1
+# x=1
+# y=1
+# G=Gτ(model,s,lt)
 
-xidx=2*x-1
-yidx=findall(model.K[xidx,:].!=0)[y]
-Δ=diagm(exp.( 2*model.α.*[-s[lt,x,y],s[lt,x,y]] ))-I(2)
-subidx=[xidx,yidx]
-# r=1+tr(Δ*(I(2)-G[subidx,subidx]) )
-r=det( I(2)+Δ*(I(2)-G[subidx,subidx]) )
-G=G-(G[:,subidx]*Δ*(I(model.Ns)-G)[subidx,:])./( 1+tr(Δ*(I(2)-G[subidx,subidx]) ) )
+# ss=s[:,:,:]
+# ss[lt,x,y]=-ss[lt,x,y]
 
-ss=s[:,:,:]
-ss[lt,x,y]=-ss[lt,x,y]
+# xidx=2*x-1
+# yidx=findall(model.K[xidx,:].!=0)[y]
+# Δ=diagm(exp.( 2*model.α.*[-s[lt,x,y],s[lt,x,y]] ))-I(2)
+# subidx=[xidx,yidx]
+# r=I(2)+Δ*(I(2)-G[subidx,subidx])
+# println(det(r)-Poss(model,ss)/Poss(model,s))
 
-GG=Gτ(model,ss,lt)
-println(findall(model.K[xidx,:].!=0))
-println(r-Poss(model,ss)/Poss(model,s))
-println(norm(G-GG))
+# GG=Gτ(model,ss,lt)
+# ((G-GG)./(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:])))
+# ------------------------------------------------------------------------
 
-A=diagm([0,1,0,-1,0])
-B=reshape(collect(1:25),5,5)
-A*B
 
-collect(1:2:4)
 # # Half
 # indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
 # # println(indexA)
