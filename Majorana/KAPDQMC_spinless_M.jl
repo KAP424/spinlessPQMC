@@ -19,7 +19,7 @@ module KAPDQMC_spinless_M
     # export EK,NN,Magnetism,CzzofSpin
 
     include("phy_update.jl")
-    export phy_update,Poss
+    export phy_update,Poss,phy_measure
 
     # include("EE_update.jl")
     # export ctrl_EEicr,EE_dir,EEICR

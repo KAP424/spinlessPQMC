@@ -1,7 +1,7 @@
 push!(LOAD_PATH,"E:/桌面/JuliaDQMC/code/spinlessPQMC/CDW/")
 using DelimitedFiles
 
-using KAPDQMC_spinless
+using KAPDQMC_spinless_CDW
 using LinearAlgebra
 using Random
 rng=MersenneTwister(1)
@@ -53,7 +53,8 @@ s=Initial_s(model,rng)
 # ------------------------------------------------------------------------
 # TEST for phy_update
 path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
-s=phy_update(path,model,s,1,false)
+s=phy_update(path,model,s,10,true)
+
 
 # lt=1
 # x=1
@@ -72,6 +73,46 @@ s=phy_update(path,model,s,1,false)
 
 # GG=Gτ(model,ss,lt)
 # ((G-GG)./(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:])))
+# ------------------------------------------------------------------------
+# TEST for phy_measure
+G=Gτ(model,s,div(model.Nt,2))
+tmp=phy_measure(model,G,div(model.Nt,2),s).*sign(1.1)
+tmp.*sign(1)
+
+
+# Ek=model.t*sum(model.K.*G)
+# Ev=R0=R1=0
+# for x in 1:div(model.Ns,2)
+#     xidx=2*x-1
+#     nnidx=findall(model.K[xidx,:].!=0)
+#     for y in eachindex(nnidx)
+#         Ev+=(1-G[xidx,xidx])*(1-G[nnidx[y],nnidx[y]])-G[xidx,nnidx[y]]*G[nnidx[y],xidx]-1/4
+#     end
+# end
+# Ev
+
+
+# for rx in 1:model.site[1]
+#     for ry in 1:model.site[2]
+#         tmp=0
+#         for ix in 1:model.site[1]
+#             for iy in 1:model.site[2]
+#                 idx1=2*( mod(iy-1,site[2])*model.site[1]+mod1(ix,site[1]) )-1
+#                 idx2=2*( mod(iy+ry-2,site[2])*model.site[1]+mod1(ix+rx,site[1]) )-1
+#                 tmp+=(1-G[idx1,idx1])*(1-G[idx2,idx2])-G[idx1,idx2]*G[idx2,idx1]
+#                 tmp+=(1-G[idx1+1,idx1+1])*(1-G[idx2+1,idx2+1])-G[idx1+1,idx2+1]*G[idx2+1,idx1+1]
+#                 tmp-=(1-G[idx1+1,idx1+1])*(1-G[idx2,idx2])-G[idx1+1,idx2]*G[idx2,idx1+1]
+#                 tmp-=(1-G[idx1,idx1])*(1-G[idx2+1,idx2+1])-G[idx1,idx2+1]*G[idx2+1,idx1]
+#             end
+#         end
+#         tmp/=prod(model.site)
+#         R0+=tmp
+#         R1+=cos(π/model.site[1]*(rx+ry))*tmp
+#     end
+# end
+# R0
+# R1
+# 1-R1/R0
 # ------------------------------------------------------------------------
 
 
