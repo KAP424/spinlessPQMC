@@ -11,7 +11,7 @@ U=8;     Δt=0.1;     Θ=0.5;
 BatchSize=10;
   
 
-L=3
+L=4
 site=[L,L]
 
 model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
@@ -39,21 +39,22 @@ model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
 # TEST for Green function
 s=Initial_s(model,rng)
 
-# τ=model.Nt
-# G=Gτ(model,s,div(model.Nt,2))
-# Gt,G0,Gt0,G0t=G4(model,s,τ,div(model.Nt,2))
-# Gt0_,G0t_=G12FF(model,s,τ,div(model.Nt,2))
-# println(norm(Gt0-Gt0_),',',norm(G0t-G0t_))
-# Gt_=Gτ(model,s,τ)
-# G0_=Gτ(model,s,div(model.Nt,2))
-# println(norm(Gt-Gt_),',',norm(G0-G0_))
+τ=model.Nt
+# τ=1
+G=Gτ(model,s,div(model.Nt,2))
+Gt,G0,Gt0,G0t=G4(model,s,τ,div(model.Nt,2))
+Gt0_,G0t_=G12FF(model,s,τ,div(model.Nt,2))
+println(norm(Gt0-Gt0_),',',norm(G0t-G0t_))
+Gt_=Gτ(model,s,τ)
+G0_=Gτ(model,s,div(model.Nt,2))
+println(norm(Gt-Gt_),',',norm(G0-G0_))
 # ------------------------------------------------------------------------
 
 
 # ------------------------------------------------------------------------
 # TEST for phy_update
 path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
-s=phy_update(path,model,s,10,true)
+# s=phy_update(path,model,s,10,true)
 
 
 # lt=1

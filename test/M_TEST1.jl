@@ -1,7 +1,7 @@
 push!(LOAD_PATH,"E:/桌面/JuliaDQMC/code/spinlessPQMC/Majorana/")
 using DelimitedFiles
 
-using KAPDQMC_spinless
+using KAPDQMC_spinless_M
 using LinearAlgebra
 using Random
 rng=MersenneTwister(1)
@@ -16,30 +16,14 @@ site=[L,L]
 
 model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
 
-# for x in 1:size(s)[2]
-#     xidx=2*x-1
-#     println(findall(model.K[xidx,:].!=0))
-# end
-
-# findall(model.K[1,:].!=0)
-
-# ------------------------------------------------------------------------
-# TEST for nn2idx
-# for i in 1:18
-#     print(i)
-#     println(nn2idx(Lattice,site,i))
-# end
-
-# K=K_Matrix(Lattice,site)
-# print(K)
-# ------------------------------------------------------------------------
-
 
 # ------------------------------------------------------------------------
 # TEST for Green function
 s=Initial_s(model,rng)
 
+
 # τ=model.Nt
+# τ=1
 # G=Gτ(model,s,div(model.Nt,2))
 # Gt,G0,Gt0,G0t=G4(model,s,τ,div(model.Nt,2))
 # Gt0_,G0t_=G12FF(model,s,τ,div(model.Nt,2))
@@ -53,26 +37,60 @@ s=Initial_s(model,rng)
 # ------------------------------------------------------------------------
 # TEST for phy_update
 path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
-s=phy_update(path,model,s,1,false)
+# s=phy_update(path,model,s,1,false)
 
-# lt=1
-# x=1
-# y=1
-# G=Gτ(model,s,lt)
+lt=1
+k=1
 
-# ss=s[:,:,:]
-# ss[lt,x,y]=-ss[lt,x,y]
+G=Gτ(model,s,lt)
 
-# xidx=2*x-1
-# yidx=findall(model.K[xidx,:].!=0)[y]
-# Δ=diagm(exp.( 2*model.α.*[-s[lt,x,y],s[lt,x,y]] ))-I(2)
-# subidx=[xidx,yidx]
-# r=I(2)+Δ*(I(2)-G[subidx,subidx])
-# println(det(r)-Poss(model,ss)/Poss(model,s))
+ss=s[:,:]
+ss[lt,k]=-ss[lt,k]
 
-# GG=Gτ(model,ss,lt)
-# ((G-GG)./(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:])))
+x,y=model.nnidx[k].I
+Δ=[0 1im*s[lt,k]; -1im*s[lt,k] 0]
+E,V=eigen(Δ) 
+Δ=V*diagm(exp.(model.α*E))*V'- I(2)
+subidx=[x,y]
+r=I(2)+Δ*(I(2)-G[subidx,subidx])
+detR=abs2(det(r))
+
+GG=Gτ(model,ss,lt)
+G=G-(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:]))
+# ((G-GG)-(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:])))
+
+
+println(norm(G-GG))
+println(detR-Poss(model,ss)/Poss(model,s))
+
+subidx
+D=model.K[:,:]
+for k in 1:size(s)[2]
+    x,y=model.nnidx[k].I
+    D[x,y]*=s[lt,x]
+    D[y,x]*=-s[lt,x]
+end
+
+DD=model.K[:,:]
+for k in 1:size(s)[2]
+    x,y=model.nnidx[k].I
+    DD[x,y]*=ss[lt,x]
+    DD[y,x]*=-ss[lt,x]
+end
+
+findall((s-ss).!=0)
+(DD-D)[subidx,subidx]
+findall((DD-D).!=0)
+DD-D
 # ------------------------------------------------------------------------
+
+# dim=3
+# A=zeros(ComplexF64,dim,dim)
+
+# A[1,2]=1im
+# A[2,1]=-1im
+# E,V=eigen(A)
+# V*diagm(exp.(E))*V'-I(dim)
 
 
 # # Half
@@ -124,3 +142,12 @@ s=phy_update(path,model,s,1,false)
 # norm(G01[indexA[:],indexA[:]]*G02[indexA[:],indexA[:]]-G02[indexA[:],indexA[:]]*G01[indexA[:],indexA[:]])
 # norm(gup1-transpose(gup2))
 
+index=findall(UpperTriangular(model.K).!=0)
+
+s=zeros(model.Nt,length(index))
+
+model.K[index[1]]
+x,y=index[1].I
+x
+reverse(idx)
+idx

@@ -9,14 +9,11 @@ module KAPDQMC_spinless_M
     include("../source/Geometry.jl")
     export K_Matrix,xy_i,i_xy,area_index,nn2idx
 
-    include("../source/Hubbard_model.jl")
+    include("Hubbard_model.jl")
     export Hubbard_Para,_Hubbard_Para,setμ
 
     include("GreenMatrix.jl")
     export Gτ,G4,Initial_s,G12FF,GroverMatrix
-
-    # include("phy_measure.jl")
-    # export EK,NN,Magnetism,CzzofSpin
 
     include("phy_update.jl")
     export phy_update,Poss,phy_measure

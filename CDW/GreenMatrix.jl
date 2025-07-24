@@ -87,11 +87,12 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
         counter=0
         for i in 1:τ2
             D=zeros(model.Ns)
-            for j in 1:2:model.Ns
-                nnidx=findall(model.K[j,:].!=0)
-                for k in eachindex(nnidx)
-                    D[j]+=s[i,Int(ceil(j/2)),k]
-                    D[k]-=s[i,Int(ceil(j/2)),k]
+            for x in 1:size(s)[2]
+                xidx=2*x-1
+                nnidx=findall(model.K[xidx,:].!=0)
+                for k in 1:size(s)[3]
+                    D[xidx]+=s[i,x,k]
+                    D[nnidx[k]]-=s[i,x,k]
                 end
             end
             UR[1,:,:]=diagm(exp.(model.α.*D))*model.eK*UR[1,:,:]
@@ -106,11 +107,12 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
         counter=0
         for i in model.Nt:-1:τ1+1
             D=zeros(model.Ns)
-            for j in 1:2:model.Ns
-                nnidx=findall(model.K[j,:].!=0)
-                for k in eachindex(nnidx)
-                    D[j]+=s[i,Int(ceil(j/2)),k]
-                    D[k]-=s[i,Int(ceil(j/2)),k]
+            for x in 1:size(s)[2]
+                xidx=2*x-1
+                nnidx=findall(model.K[xidx,:].!=0)
+                for k in 1:size(s)[3]
+                    D[xidx]+=s[i,x,k]
+                    D[nnidx[k]]-=s[i,x,k]
                 end
             end
             UL[end,:,:]=UL[end,:,:]*diagm(exp.(model.α.*D))*model.eK
@@ -128,11 +130,12 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
             for j in 1:model.BatchSize
                 # D=[model.η[x] for x in s[:,τ2+(i-1)*model.BatchSize+j]]
                 D=zeros(model.Ns)
-                for jj in 1:2:model.Ns
-                    nnidx=findall(model.K[jj,:].!=0)
-                    for k in eachindex(nnidx)
-                        D[jj]+=s[τ2+(i-1)*model.BatchSize+j,Int(ceil(jj/2)),k]
-                        D[k]-=s[τ2+(i-1)*model.BatchSize+j,Int(ceil(jj/2)),k]
+                for x in 1:size(s)[2]
+                    xidx=2*x-1
+                    nnidx=findall(model.K[xidx,:].!=0)
+                    for k in 1:size(s)[3]
+                        D[xidx]+=s[τ2+(i-1)*model.BatchSize+j,x,k]
+                        D[nnidx[k]]-=s[τ2+(i-1)*model.BatchSize+j,x,k]
                     end
                 end
                 BBs[i,:,:]=diagm(exp.(model.α.*D))*model.eK*BBs[i,:,:]
@@ -145,11 +148,12 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
         for j in τ2+(size(BBs)[1]-1)*model.BatchSize+1:τ1
             # D=[model.η[x] for x in s[:,j]]
             D=zeros(model.Ns)
-            for jj in 1:2:model.Ns
-                nnidx=findall(model.K[jj,:].!=0)
-                for k in eachindex(nnidx)
-                    D[jj]+=s[j,Int(ceil(jj/2)),k]
-                    D[k]-=s[j,Int(ceil(jj/2)),k]
+            for x in 1:size(s)[2]
+                xidx=2*x-1
+                nnidx=findall(model.K[xidx,:].!=0)
+                for k in 1:size(s)[3]
+                    D[xidx]+=s[j,x,k]
+                    D[nnidx[k]]-=s[j,x,k]
                 end
             end
             BBs[end,:,:]=diagm(exp.(model.α.*D))*model.eK*BBs[end,:,:]
@@ -165,15 +169,15 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
             G[i,:,:]=I(model.Ns)-UR[i,:,:]*inv(UL[i,:,:]*UR[i,:,:])*UL[i,:,:]
 
             # -------------------------------------------------------
-            # if i <size(G)[1]
-            #     if norm(Gτ(model,s,τ2+(i-1)*model.BatchSize)-G[i,:,:])>1e-3
-            #         error("$i Gt")
-            #     end
-            # else
-            #     if norm(Gτ(model,s,τ1)-G[i,:,:])>1e-3
-            #         error("$i Gt")
-            #     end
-            # end
+            if i <size(G)[1]
+                if norm(Gτ(model,s,τ2+(i-1)*model.BatchSize)-G[i,:,:])>1e-3
+                    error("$i Gt")
+                end
+            else
+                if norm(Gτ(model,s,τ1)-G[i,:,:])>1e-3
+                    error("$i Gt")
+                end
+            end
             # -------------------------------------------------------
         end
 
@@ -214,11 +218,12 @@ function G12FF(model,s,τ1,τ2)
         for i in τ2+1:τ1
             # D=[model.η[x] for x in s[:,i]]
             D=zeros(model.Ns)
-            for j in 1:2:model.Ns
-                nnidx=findall(model.K[j,:].!=0)
-                for k in eachindex(nnidx)
-                    D[j]+=s[i,Int(ceil(j/2)),k]
-                    D[k]-=s[i,Int(ceil(j/2)),k]
+            for x in 1:size(s)[2]
+                xidx=2*x-1
+                nnidx=findall(model.K[xidx,:].!=0)
+                for k in 1:size(s)[3]
+                    D[xidx]+=s[i,x,k]
+                    D[nnidx[k]]-=s[i,x,k]
                 end
             end
             BBs=diagm(exp.(model.α.*D))*model.eK*BBs
