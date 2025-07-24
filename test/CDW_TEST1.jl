@@ -7,11 +7,11 @@ using Random
 rng=MersenneTwister(1)
 
 t=1;   Lattice="HoneyComb"    
-U=8;     Δt=0.1;     Θ=0.5;
+U=1;     Δt=0.1;     Θ=0.3;
 BatchSize=10;
   
 
-L=4
+L=6
 site=[L,L]
 
 model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
@@ -39,22 +39,22 @@ model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
 # TEST for Green function
 s=Initial_s(model,rng)
 
-τ=model.Nt
-# τ=1
-G=Gτ(model,s,div(model.Nt,2))
-Gt,G0,Gt0,G0t=G4(model,s,τ,div(model.Nt,2))
-Gt0_,G0t_=G12FF(model,s,τ,div(model.Nt,2))
-println(norm(Gt0-Gt0_),',',norm(G0t-G0t_))
-Gt_=Gτ(model,s,τ)
-G0_=Gτ(model,s,div(model.Nt,2))
-println(norm(Gt-Gt_),',',norm(G0-G0_))
+# τ=model.Nt
+# # τ=1
+# G=Gτ(model,s,div(model.Nt,2))
+# Gt,G0,Gt0,G0t=G4(model,s,τ,div(model.Nt,2))
+# Gt0_,G0t_=G12FF(model,s,τ,div(model.Nt,2))
+# println(norm(Gt0-Gt0_),',',norm(G0t-G0t_))
+# Gt_=Gτ(model,s,τ)
+# G0_=Gτ(model,s,div(model.Nt,2))
+# println(norm(Gt-Gt_),',',norm(G0-G0_))
 # ------------------------------------------------------------------------
 
 
 # ------------------------------------------------------------------------
 # TEST for phy_update
 path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
-# s=phy_update(path,model,s,10,true)
+s=phy_update(path,model,s,1,true)
 
 
 # lt=1
@@ -76,9 +76,9 @@ path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
 # ((G-GG)./(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:])))
 # ------------------------------------------------------------------------
 # TEST for phy_measure
-G=Gτ(model,s,div(model.Nt,2))
-tmp=phy_measure(model,G,div(model.Nt,2),s).*sign(1.1)
-tmp.*sign(1)
+# G=Gτ(model,s,div(model.Nt,2))
+# tmp=phy_measure(model,G,div(model.Nt,2),s).*sign(1.1)
+# tmp.*sign(1)
 
 
 # Ek=model.t*sum(model.K.*G)

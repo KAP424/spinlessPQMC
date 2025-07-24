@@ -1,20 +1,14 @@
 # 2d Trotter Decomposition
 # using density channel ±1 HS transformation
 
-function Initial_s(model::_Hubbard_Para,rng::MersenneTwister)::Array{Int8,3}
+function Initial_s(model::_Hubbard_Para,rng::MersenneTwister)::Array{Int8,2}
     sp=Random.Sampler(rng,[1,-1])
 
-    if model.Lattice=="SQUARE"
-        s=zeros(Int8,model.Nt,div(model.Ns,2),4)
-    elseif model.Lattice=="HoneyComb"
-        s=zeros(Int8,model.Nt,div(model.Ns,2),3)
-    end
+    s=zeros(model.Nt,length(model.nnidx))
+
     for i = 1:size(s)[1]
         for j = 1:size(s)[2]
-            for k in 1:size(s)[3]
-                # 从elements中随机选择一个元素来填充当前位置  
-                s[i,j,k] =rand(rng,sp)
-            end
+            s[i,j] =rand(rng,sp)
         end  
     end  
 
@@ -23,20 +17,17 @@ end
 
 
 "equal time Green function"
-function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
+function Gτ(model::_Hubbard_Para,s::Array{Int8,2},τ::Int64)::Array{Float64,2}
     BL::Array{Float64,2}=model.Pt'[:,:]
     BR::Array{Float64,2}=model.Pt[:,:]
 
     counter=0
     for i in model.Nt:-1:τ+1
         D=zeros(model.Ns)
-        for x in 1:size(s)[2]
-            xidx=2*x-1
-            nnidx=findall(model.K[xidx,:].!=0)
-            for k in 1:size(s)[3]
-                D[xidx]+=s[i,x,k]
-                D[nnidx[k]]-=s[i,x,k]
-            end
+        for k in 1:size(s)[2]
+            x,y=model.nnidx[k].I
+            D[x]+=s[i,k]
+            D[y]-=s[i,k]
         end
         BL=BL*diagm(exp.(model.α.*D))*model.eK
         counter+=1
@@ -48,13 +39,10 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
     counter=0
     for i in 1:1:τ
         D=zeros(model.Ns)
-        for x in 1:size(s)[2]
-            xidx=2*x-1
-            nnidx=findall(model.K[xidx,:].!=0)
-            for k in 1:size(s)[3]
-                D[xidx]+=s[i,x,k]
-                D[nnidx[k]]-=s[i,x,k]
-            end
+        for k in 1:size(s)[2]
+            x,y=model.nnidx[k].I
+            D[x]+=s[i,k]
+            D[y]-=s[i,k]
         end
         BR=diagm(exp.(model.α.*D))*model.eK*BR
         counter+=1
@@ -72,7 +60,7 @@ end
 
 
 "displaced Green function G(τ₁,τ₂)"
-function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
+function G4(model::_Hubbard_Para,s::Array{Int8,2},τ1::Int64,τ2::Int64)
     if τ1>τ2
         BBs=zeros(Float64,cld(τ1-τ2,model.BatchSize),model.Ns,model.Ns)
         BBsInv=zeros(Float64,size(BBs))
@@ -87,13 +75,10 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
         counter=0
         for i in 1:τ2
             D=zeros(model.Ns)
-            for x in 1:size(s)[2]
-                xidx=2*x-1
-                nnidx=findall(model.K[xidx,:].!=0)
-                for k in 1:size(s)[3]
-                    D[xidx]+=s[i,x,k]
-                    D[nnidx[k]]-=s[i,x,k]
-                end
+            for k in 1:size(s)[2]
+                x,y=model.nnidx[k].I
+                D[x]+=s[i,k]
+                D[y]-=s[i,k]
             end
             UR[1,:,:]=diagm(exp.(model.α.*D))*model.eK*UR[1,:,:]
             counter+=1
@@ -107,13 +92,10 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
         counter=0
         for i in model.Nt:-1:τ1+1
             D=zeros(model.Ns)
-            for x in 1:size(s)[2]
-                xidx=2*x-1
-                nnidx=findall(model.K[xidx,:].!=0)
-                for k in 1:size(s)[3]
-                    D[xidx]+=s[i,x,k]
-                    D[nnidx[k]]-=s[i,x,k]
-                end
+            for k in 1:size(s)[2]
+                x,y=model.nnidx[k].I
+                D[x]+=s[i,k]
+                D[y]-=s[i,k]
             end
             UL[end,:,:]=UL[end,:,:]*diagm(exp.(model.α.*D))*model.eK
             counter+=1
@@ -130,13 +112,10 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
             for j in 1:model.BatchSize
                 # D=[model.η[x] for x in s[:,τ2+(i-1)*model.BatchSize+j]]
                 D=zeros(model.Ns)
-                for x in 1:size(s)[2]
-                    xidx=2*x-1
-                    nnidx=findall(model.K[xidx,:].!=0)
-                    for k in 1:size(s)[3]
-                        D[xidx]+=s[τ2+(i-1)*model.BatchSize+j,x,k]
-                        D[nnidx[k]]-=s[τ2+(i-1)*model.BatchSize+j,x,k]
-                    end
+                for k in 1:size(s)[2]
+                    x,y=model.nnidx[k].I
+                    D[x]+=s[τ2+(i-1)*model.BatchSize+j,k]
+                    D[y]-=s[τ2+(i-1)*model.BatchSize+j,k]
                 end
                 BBs[i,:,:]=diagm(exp.(model.α.*D))*model.eK*BBs[i,:,:]
                 BBsInv[i,:,:]=BBsInv[i,:,:]*model.eKinv*diagm(exp.(-model.α.*D))
@@ -148,13 +127,10 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
         for j in τ2+(size(BBs)[1]-1)*model.BatchSize+1:τ1
             # D=[model.η[x] for x in s[:,j]]
             D=zeros(model.Ns)
-            for x in 1:size(s)[2]
-                xidx=2*x-1
-                nnidx=findall(model.K[xidx,:].!=0)
-                for k in 1:size(s)[3]
-                    D[xidx]+=s[j,x,k]
-                    D[nnidx[k]]-=s[j,x,k]
-                end
+            for k in 1:size(s)[2]
+                x,y=model.nnidx[k].I
+                D[x]+=s[j,k]
+                D[y]-=s[j,k]
             end
             BBs[end,:,:]=diagm(exp.(model.α.*D))*model.eK*BBs[end,:,:]
             BBsInv[end,:,:]=BBsInv[end,:,:]*model.eKinv*diagm(exp.(-model.α.*D))
@@ -218,13 +194,10 @@ function G12FF(model,s,τ1,τ2)
         for i in τ2+1:τ1
             # D=[model.η[x] for x in s[:,i]]
             D=zeros(model.Ns)
-            for x in 1:size(s)[2]
-                xidx=2*x-1
-                nnidx=findall(model.K[xidx,:].!=0)
-                for k in 1:size(s)[3]
-                    D[xidx]+=s[i,x,k]
-                    D[nnidx[k]]-=s[i,x,k]
-                end
+            for k in 1:size(s)[2]
+                x,y=model.nnidx[k].I
+                D[x]+=s[i,k]
+                D[y]-=s[i,k]
             end
             BBs=diagm(exp.(model.α.*D))*model.eK*BBs
             BBsInv=BBsInv*model.eKinv*diagm(exp.(-model.α.*D))

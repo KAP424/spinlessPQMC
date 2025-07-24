@@ -19,6 +19,7 @@ struct _Hubbard_Para
     eK::Array{Float64,2}
     HalfeKinv::Array{Float64,2}
     eKinv::Array{Float64,2}
+    nnidx::Vector{CartesianIndex{2}}
 end
 
 
@@ -28,9 +29,10 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     
     α::Float64=acosh(exp(Δt*U/2)) 
     
-    K::Array{Float64,2}=t.*K_Matrix(Lattice,site)
+    K::Array{Float64,2}=K_Matrix(Lattice,site)
     Ns::Int64=size(K)[1]
 
+    nnidx=findall(UpperTriangular(K).!=0)
     # 交错化学势，打开gap，去兼并
     μ=0.0
     if Lattice=="HoneyComb"
@@ -44,7 +46,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     # K[K .!= 0] .+=( rand(size(K)...) * 0.1)[K.!= 0]
     # K=(K+K')./2
 
-    E,V=eigen(K)
+    E,V=eigen(t*K)
     
     HalfeK=V*diagm(exp.(-Δt.*E./2))*V'
     eK=V*diagm(exp.(-Δt.*E))*V'
@@ -60,7 +62,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
         end
     end
 
-    return _Hubbard_Para(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,WrapTime,Δt,α,Pt,HalfeK,eK,HalfeKinv,eKinv)
+    return _Hubbard_Para(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,WrapTime,Δt,α,Pt,HalfeK,eK,HalfeKinv,eKinv,nnidx)
 
 end
 

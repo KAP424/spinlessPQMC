@@ -1,10 +1,10 @@
-function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::Int64,record)
+function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,2},Sweeps::Int64,record)
     if model.Lattice=="SQUARE"
         name="□"
     elseif model.Lattice=="HoneyComb"
         name="HC"
     end
-    file="$(path)CDW_PHY$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)BS$(model.BatchSize).csv"
+    file="$(path)$(name)CDW_PHY$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)BS$(model.BatchSize).csv"
     
     
     rng=MersenneTwister(Threads.threadid())
@@ -18,60 +18,54 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                 G=Gτ(model,s,lt)
             else
                 D=zeros(model.Ns)
-                for x in 1:size(s)[2]
-                    xidx=2*x-1
-                    nnidx=findall(model.K[xidx,:].!=0)
-                    for k in 1:size(s)[3]
-                        D[xidx]+=s[lt,x,k]
-                        D[nnidx[k]]-=s[lt,x,k]
-                    end
+                for k in 1:size(s)[2]
+                    x,y=model.nnidx[k].I
+                    D[x]+=s[lt,k]
+                    D[y]-=s[lt,k]
                 end
                 G=diagm(exp.(model.α.*D))*model.eK *G* model.eKinv*diagm(exp.(-model.α.*D))
                 
                 #####################################################################
-                # if norm(G-Gτ(model,s,lt))>1e-4 
-                #     error(norm(G-Gτ(model,s,lt))," $(lt) :asd")
-                # end
+                if norm(G-Gτ(model,s,lt))>1e-4 
+                    error(norm(G-Gτ(model,s,lt))," $(lt) :asd")
+                end
                 #####################################################################
             end
 
-            for x in 1:size(s)[2]
-                for y in 1:size(s)[3]
-                    xidx=2*x-1
-                    yidx=findall(model.K[xidx,:].!=0)[y]
-                    Δ=diagm(exp.( 2*model.α.*[-s[lt,x,y],s[lt,x,y]] ))-I(2)
-                    subidx=[xidx,yidx]
-                    r=I(2)+Δ*(I(2)-G[subidx,subidx])
-                    detR=det(r)
-                    if detR<0
-                        println("Warning for negative possibility!")
+            for k in 1:size(s)[2]
+                x,y=model.nnidx[k].I
+                Δ=diagm(exp.( 2*model.α.*[-s[lt,k],s[lt,k]] ))-I(2)
+                subidx=[x,y]
+                r=I(2)+Δ*(I(2)-G[subidx,subidx])
+                detR=det(r)
+                if detR<0
+                    println("Warning for negative possibility!")
+                end
+                ####################################################################
+                ss=s[:,:]
+                ss[lt,k]=-ss[lt,k]
+                if abs(Poss(model,ss)/Poss(model,s)-detR)>1e-3
+                    println("possibility error:",abs(Poss(model,ss)/Poss(model,s)-detR))
+                end
+                ####################################################################
+                if rand(rng)<abs(detR)
+                    G=G-(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:]))
+                    s[lt,k]=-s[lt,k]
+
+                    ####################################################################
+                    if norm(G-Gτ(model,s,lt))>1e-4
+                        println("G update error:",norm(G-Gτ(model,s,lt)))
                     end
-                    ####################################################################
-                    # ss=s[:,:,:]
-                    # ss[lt,x,y]=-ss[lt,x,y]
-                    # if abs(Poss(model,ss)/Poss(model,s)-detR)>1e-3
-                    #     error("possibility error")
-                    # end
-                    ####################################################################
-                    if rand(rng)<abs(detR)
-                        G=G-(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:]))
-                        s[lt,x,y]=-s[lt,x,y]
+                    #####################################################################
 
-                        ####################################################################
-                        # if norm(G-Gτ(model,s,lt))>1e-4
-                        #     error("G update error:",G-Gτ(model,s,lt))
-                        # end
-                        #####################################################################
-
-                        if record && abs(lt-model.Nt/2)<=model.WrapTime
-                            tmp=phy_measure(model,G,lt,s).*sign(detR)
-                            Ek+=tmp[1]
-                            Ev+=tmp[2]
-                            R0+=tmp[3]
-                            R1+=tmp[4]
-                            counter+=1
-                            sg+=sign(detR)
-                        end
+                    if record && abs(lt-model.Nt/2)<=model.WrapTime
+                        tmp=phy_measure(model,G,lt,s).*sign(detR)
+                        Ek+=tmp[1]
+                        Ev+=tmp[2]
+                        R0+=tmp[3]
+                        R1+=tmp[4]
+                        counter+=1
+                        sg+=sign(detR)
                     end
                 end
             end
@@ -82,60 +76,54 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                 G=Gτ(model,s,lt)
             else
                 D=zeros(model.Ns)
-                for x in 1:size(s)[2]
-                    xidx=2*x-1
-                    nnidx=findall(model.K[xidx,:].!=0)
-                    for k in 1:size(s)[3]
-                        D[xidx]+=s[lt+1,x,k]
-                        D[nnidx[k]]-=s[lt+1,x,k]
-                    end
+                for k in 1:size(s)[2]
+                    x,y=model.nnidx[k].I
+                    D[x]+=s[lt+1,k]
+                    D[y]-=s[lt+1,k]
                 end
                 G=model.eKinv* diagm(exp.(-model.α.*D)) *G* diagm(exp.(model.α.*D))*model.eK
                 
                 #####################################################################
-                # if norm(G-Gτ(model,s,lt))>1e-4
-                #     error(norm(G-Gτ(model,s,lt)),"ltltltl")
-                # end
+                if norm(G-Gτ(model,s,lt))>1e-4
+                    println("reversal wrap error: ",norm(G-Gτ(model,s,lt)))
+                end
                 #####################################################################
             end
 
-            for x in 1:size(s)[2]
-                for y in 1:size(s)[3]
-                    xidx=2*x-1
-                    yidx=findall(model.K[xidx,:].!=0)[y]
-                    Δ=diagm(exp.( 2*model.α.*[-s[lt,x,y],s[lt,x,y]] ))-I(2)
-                    subidx=[xidx,yidx]
-                    r=I(2)+Δ*(I(2)-G[subidx,subidx])
-                    detR=det(r)
-                    if detR<0
-                        println("Warning for negative possibility!")
+            for k in 1:size(s)[2]
+                x,y=model.nnidx[k].I
+                Δ=diagm(exp.( 2*model.α.*[-s[lt,k],s[lt,k]] ))-I(2)
+                subidx=[x,y]
+                r=I(2)+Δ*(I(2)-G[subidx,subidx])
+                detR=det(r)
+                if detR<0
+                    println("Warning for negative possibility!")
+                end
+                ####################################################################
+                ss=s[:,:]
+                ss[lt,k]=-ss[lt,k]
+                if abs(Poss(model,ss)/Poss(model,s)-detR)>1e-3
+                    println("possibility error:",abs(Poss(model,ss)/Poss(model,s)-detR))
+                end
+                ####################################################################
+                if rand(rng)<abs(detR)
+                    G=G-(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:]))
+                    s[lt,k]=-s[lt,k]
+
+                    ####################################################################
+                    if norm(G-Gτ(model,s,lt))>1e-4
+                        println("G update error:",norm(G-Gτ(model,s,lt)))
                     end
-                    ####################################################################
-                    # ss=s[:,:,:]
-                    # ss[lt,x,y]=-ss[lt,x,y]
-                    # if abs(Poss(model,ss)/Poss(model,s)-detR)>1e-3
-                    #     error("possibility error")
-                    # end
-                    ####################################################################
-                    if rand(rng)<abs(detR)
-                        G=G-(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:]))
-                        s[lt,x,y]=-s[lt,x,y]
+                    #####################################################################
 
-                        ####################################################################
-                        # if norm(G-Gτ(model,s,lt))>1e-4
-                        #     error("G update error:",G-Gτ(model,s,lt))
-                        # end
-                        #####################################################################
-
-                        if record && abs(lt-model.Nt/2)<=model.WrapTime
-                            tmp=phy_measure(model,G,lt,s).*sign(detR)
-                            Ek+=tmp[1]
-                            Ev+=tmp[2]
-                            R0+=tmp[3]
-                            R1+=tmp[4]
-                            counter+=1
-                            sg+=sign(detR)
-                        end
+                    if record && abs(lt-model.Nt/2)<=model.WrapTime
+                        tmp=phy_measure(model,G,lt,s).*sign(detR)
+                        Ek+=tmp[1]
+                        Ev+=tmp[2]
+                        R0+=tmp[3]
+                        R1+=tmp[4]
+                        counter+=1
+                        sg+=sign(detR)
                     end
                 end
             end
@@ -159,13 +147,10 @@ function Poss(model,s)
 
     for i in 1:model.Nt
         D=zeros(model.Ns)
-        for x in 1:size(s)[2]
-            xidx=2*x-1
-            nnidx=findall(model.K[xidx,:].!=0)
-            for k in 1:size(s)[3]
-                D[xidx]+=s[i,x,k]
-                D[nnidx[k]]-=s[i,x,k]
-            end
+        for k in 1:size(s)[2]
+            x,y=model.nnidx[k].I
+            D[x]+=s[i,k]
+            D[y]-=s[i,k]
         end
         A=diagm(exp.(model.α.*D))*model.eK*A
     end
@@ -178,68 +163,75 @@ function phy_measure(model,G,lt,s)
     if lt>model.Nt/2
         for i in lt:-1:div(model.Nt,2)+1
             D=zeros(model.Ns)
-            for x in 1:size(s)[2]
-                xidx=2*x-1
-                nnidx=findall(model.K[xidx,:].!=0)
-                for k in 1:size(s)[3]
-                    D[xidx]+=s[i,x,k]
-                    D[nnidx[k]]-=s[i,x,k]
-                end
+            for k in 1:size(s)[2]
+                x,y=model.nnidx[k].I
+                D[x]+=s[i,k]
+                D[y]-=s[i,k]
             end
             G0= model.eKinv*diagm(exp.(-model.α.*D)) *G0*  diagm(exp.(model.α.*D))*model.eK
         end
     else
         for i in lt+1:div(model.Nt,2)
             D=zeros(model.Ns)
-            for x in 1:size(s)[2]
-                xidx=2*x-1
-                nnidx=findall(model.K[xidx,:].!=0)
-                for k in 1:size(s)[3]
-                    D[xidx]+=s[i,x,k]
-                    D[nnidx[k]]-=s[i,x,k]
-                end
+            for k in 1:size(s)[2]
+                x,y=model.nnidx[k].I
+                D[x]+=s[i,k]
+                D[y]-=s[i,k]
             end
             G0=diagm(exp.(model.α.*D))*model.eK *G0* model.eKinv*diagm(exp.(-model.α.*D))  
         end
     end
     #####################################################################
-    # if norm(G0-Gτ(model,s,div(model.Nt,2)))>1e-4 
-    #     error("record error")
-    # end
+    if norm(G0-Gτ(model,s,div(model.Nt,2)))>1e-4 
+        println("record error:",norm(G0-Gτ(model,s,div(model.Nt,2))))
+    end
     #####################################################################
 
     G0=model.HalfeK* G0 *model.HalfeKinv
 
     Ek=model.t*sum(model.K.*G0)
     Ev=R0=R1=0
-    for x in 1:div(model.Ns,2)
-        xidx=2*x-1
-        nnidx=findall(model.K[xidx,:].!=0)
-        for y in eachindex(nnidx)
-            Ev+=(1-G0[xidx,xidx])*(1-G0[nnidx[y],nnidx[y]])-G0[xidx,nnidx[y]]*G0[nnidx[y],xidx]-1/4
-        end
+    for k in 1:length(model.nnidx)
+        x,y=model.nnidx[k].I
+        Ev+=(1-G0[x,x])*(1-G0[y,y])-G0[x,y]*G0[y,x]-1/4
     end
     Ev*=model.U
-
-    for rx in 1:model.site[1]
-        for ry in 1:model.site[2]
-            tmp=0
-            for ix in 1:model.site[1]
-                for iy in 1:model.site[2]
-                    idx1=2*( mod(iy-1,model.site[2])*model.site[1]+mod1(ix,model.site[1]) )-1
-                    idx2=2*( mod(iy+ry-2,model.site[2])*model.site[1]+mod1(ix+rx,model.site[1]) )-1
-                    tmp+=(1-G0[idx1,idx1])*(1-G0[idx2,idx2])-G0[idx1,idx2]*G0[idx2,idx1]
-                    tmp+=(1-G0[idx1+1,idx1+1])*(1-G0[idx2+1,idx2+1])-G0[idx1+1,idx2+1]*G[idx2+1,idx1+1]
-                    tmp-=(1-G0[idx1+1,idx1+1])*(1-G0[idx2,idx2])-G0[idx1+1,idx2]*G0[idx2,idx1+1]
-                    tmp-=(1-G0[idx1,idx1])*(1-G0[idx2+1,idx2+1])-G0[idx1,idx2+1]*G0[idx2+1,idx1]
+    if model.Lattice=="HoneyComb"
+        for rx in 1:model.site[1]
+            for ry in 1:model.site[2]
+                tmp=0
+                for ix in 1:model.site[1]
+                    for iy in 1:model.site[2]
+                        idx1=2*( (iy-1)*model.site[1]+ix) -1
+                        idx2=2*( mod(iy+ry-1,model.site[2])*model.site[1]+mod1(ix+rx,model.site[1]) )-1
+                        tmp+=(1-G0[idx1,idx1])*(1-G0[idx2,idx2])-G0[idx1,idx2]*G0[idx2,idx1]
+                        tmp+=(1-G0[idx1+1,idx1+1])*(1-G0[idx2+1,idx2+1])-G0[idx1+1,idx2+1]*G[idx2+1,idx1+1]
+                        tmp-=(1-G0[idx1+1,idx1+1])*(1-G0[idx2,idx2])-G0[idx1+1,idx2]*G0[idx2,idx1+1]
+                        tmp-=(1-G0[idx1,idx1])*(1-G0[idx2+1,idx2+1])-G0[idx1,idx2+1]*G0[idx2+1,idx1]
+                    end
                 end
+                tmp/=prod(model.site)
+                R0+=tmp
+                R1+=cos(2*π/model.site[1]*rx+2*π/model.site[2]*ry)*tmp
             end
-            tmp/=prod(model.site)
-            R0+=tmp
-            R1+=cos(π/model.site[1]*(rx+ry))*tmp
+        end
+    elseif model.Lattice=="SQUARE"
+        for rx in 1:model.site[1]
+            for ry in 1:model.site[2]
+                tmp=0
+                for ix in 1:model.site[1]
+                    for iy in 1:model.site[2]
+                        idx1=ix+(iy-1)*model.site[1]
+                        idx2=mod1(rx+ix,model.site[1])+mod((ry+iy-1),model.site[2])*model.site[1]
+                        tmp+=(1-G0[idx1,idx1])*(1-G0[idx2,idx2])-G0[idx1,idx2]*G0[idx2,idx1]
+                    end
+                end
+                tmp/=prod(model.site)
+                R0+=tmp*cos(π*(rx+ry))
+                R1+=cos(π*(rx+ry)+2*π/model.site[1]*rx+2*π/model.site[2]*ry )*tmp
+            end
         end
     end
-
     # 1-R1/R0
     return Ek,Ev,R0,R1
 end
