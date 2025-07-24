@@ -29,8 +29,9 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     
     α::Float64=acos(exp(-Δt*U/2)) 
     
-    K=1im*UpperTriangular(K_Matrix(Lattice,site))
-    K=(K+K')/2
+    K=K_Matrix(Lattice,site)
+    H0=1im*UpperTriangular(K_Matrix(Lattice,site))
+    H0=(H0+H0')/2
     Ns::Int64=size(K)[1]
 
     nnidx=findall(UpperTriangular(K).!=0)
@@ -47,7 +48,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     # K[K .!= 0] .+=( rand(size(K)...) * 0.1)[K.!= 0]
     # K=(K+K')./2
 
-    E,V=eigen(t*K)
+    E,V=eigen(t*H0)
     HalfeK=V*diagm(exp.(-Δt.*E./2))*V'
     eK=V*diagm(exp.(-Δt.*E))*V'
     HalfeKinv=V*diagm(exp.(Δt.*E./2))*V'

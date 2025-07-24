@@ -237,16 +237,13 @@ function Poss(model,s)
     A=model.Pt[:,:]
 
     for i in 1:model.Nt
-        D=zeros(ComplexF64,model.Ns,model.Ns)
-        for x in 1:size(s)[2]
-            xidx=2*x-1
-            nnidx=findall(model.K[xidx,:].!=0)
-            for k in 1:size(s)[3]
-                D[xidx,nnidx[k]]=s[i,x,k]*1im
-                D[nnidx[k],xidx]=+s[i,x,k]*1im
-            end
+        D=model.K[:,:]
+        for k in 1:size(s)[2]
+            x,y=model.nnidx[k].I
+            D[x,y]*=s[i,k]*1im/2
+            D[y,x]*=-s[i,k]*1im/2
         end
-        E,V=eigen(D/2)
+        E,V=eigen(D)
         A=V*diagm(exp.(model.α.*E))*V'*model.eK*A
     end
     A=model.Pt'*A

@@ -21,7 +21,6 @@ model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
 # TEST for Green function
 s=Initial_s(model,rng)
 
-
 # τ=model.Nt
 # τ=1
 # G=Gτ(model,s,div(model.Nt,2))
@@ -48,10 +47,10 @@ ss=s[:,:]
 ss[lt,k]=-ss[lt,k]
 
 x,y=model.nnidx[k].I
-Δ=[0 1im*s[lt,k]; -1im*s[lt,k] 0]
+subidx=[x,y]
+Δ=[0 -1im*s[lt,k]; 1im*s[lt,k] 0]
 E,V=eigen(Δ) 
 Δ=V*diagm(exp.(model.α*E))*V'- I(2)
-subidx=[x,y]
 r=I(2)+Δ*(I(2)-G[subidx,subidx])
 detR=abs2(det(r))
 
@@ -63,35 +62,32 @@ G=G-(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:]))
 println(norm(G-GG))
 println(detR-Poss(model,ss)/Poss(model,s))
 
-subidx
 D=model.K[:,:]
 for k in 1:size(s)[2]
     x,y=model.nnidx[k].I
-    D[x,y]*=s[lt,x]
-    D[y,x]*=-s[lt,x]
+    D[x,y]*=s[lt,k]*1im/2
+    D[y,x]*=-s[lt,k]*1im/2
 end
 
 DD=model.K[:,:]
 for k in 1:size(s)[2]
     x,y=model.nnidx[k].I
-    DD[x,y]*=ss[lt,x]
-    DD[y,x]*=-ss[lt,x]
+    DD[x,y]*=ss[lt,k]*1im/2
+    DD[y,x]*=-ss[lt,k]*1im/2
 end
 
 findall((s-ss).!=0)
 (DD-D)[subidx,subidx]
 findall((DD-D).!=0)
-DD-D
+
+
+
+
+
+
+
+
 # ------------------------------------------------------------------------
-
-# dim=3
-# A=zeros(ComplexF64,dim,dim)
-
-# A[1,2]=1im
-# A[2,1]=-1im
-# E,V=eigen(A)
-# V*diagm(exp.(E))*V'-I(dim)
-
 
 # # Half
 # indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
@@ -141,13 +137,3 @@ DD-D
 # norm(det(gup1)-det(gup2))
 # norm(G01[indexA[:],indexA[:]]*G02[indexA[:],indexA[:]]-G02[indexA[:],indexA[:]]*G01[indexA[:],indexA[:]])
 # norm(gup1-transpose(gup2))
-
-index=findall(UpperTriangular(model.K).!=0)
-
-s=zeros(model.Nt,length(index))
-
-model.K[index[1]]
-x,y=index[1].I
-x
-reverse(idx)
-idx
