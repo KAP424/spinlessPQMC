@@ -26,8 +26,8 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,2},τ::Int64)::Array{ComplexF64,
         D=model.K[:,:]
         for k in 1:size(s)[2]
             x,y=model.nnidx[k].I
-            D[x,y]*=s[i,x]
-            D[y,x]*=-s[i,x]
+            D[x,y]*=s[i,k]*1im/2
+            D[y,x]*=-s[i,k]*1im/2
         end
         E,V=eigen(D)
         BL=BL*V*diagm(exp.(model.α.*E))*V'*model.eK
@@ -42,8 +42,8 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,2},τ::Int64)::Array{ComplexF64,
         D=model.K[:,:]
         for k in 1:size(s)[2]
             x,y=model.nnidx[k].I
-            D[x,y]*=s[i,x]
-            D[y,x]*=-s[i,x]
+            D[x,y]*=s[i,k]*1im/2
+            D[y,x]*=-s[i,k]*1im/2
         end
         E,V=eigen(D)
         BR=V*diagm(exp.(model.α.*E))*V'*model.eK*BR
