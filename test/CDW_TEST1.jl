@@ -1,3 +1,9 @@
+############-----divation attention------#########################
+#HC: U=8;     Δt=0.05;     Θ=0.3;      OK
+#HC: U=8;     Δt=0.1;     Θ=0.3;       Wrong
+#-----------------------------------------------------------------
+
+
 push!(LOAD_PATH,"E:/桌面/JuliaDQMC/code/spinlessPQMC/CDW/")
 using DelimitedFiles
 
@@ -6,8 +12,8 @@ using LinearAlgebra
 using Random
 rng=MersenneTwister(1)
 
-t=1;   Lattice="HoneyComb"    
-U=1;     Δt=0.1;     Θ=0.3;
+t=1;   Lattice="SQUARE"    
+U=8;     Δt=0.05;     Θ=0.3;
 BatchSize=10;
   
 
