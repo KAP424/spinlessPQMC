@@ -1,5 +1,5 @@
 # using density channel ±1 HS transformation
-
+# NOW
 # mutable
 struct _Hubbard_Para
     Lattice::String
