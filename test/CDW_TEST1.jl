@@ -12,8 +12,8 @@ using LinearAlgebra
 using Random
 rng=MersenneTwister(1)
 
-t=1;   Lattice="SQUARE"    
-U=8;     Δt=0.05;     Θ=0.3;
+t=1;   Lattice="HoneyComb"    
+U=8;     Δt=0.1;     Θ=0.3;
 BatchSize=10;
   
 
@@ -21,7 +21,7 @@ L=6
 site=[L,L]
 
 model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
-
+nn2idx(Lattice,site,1)
 # for x in 1:size(s)[2]
 #     xidx=2*x-1
 #     println(findall(model.K[xidx,:].!=0))

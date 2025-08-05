@@ -1,10 +1,9 @@
 # 2d Trotter Decomposition
 # using density channel ±1 HS transformation
-
 function Initial_s(model::_Hubbard_Para,rng::MersenneTwister)::Array{Int8,2}
     sp=Random.Sampler(rng,[1,-1])
 
-    s=zeros(model.Nt,length(model.nnidx))
+    s=zeros(Int8,model.Nt,length(model.nnidx))
 
     for i = 1:size(s)[1]
         for j = 1:size(s)[2]
@@ -17,17 +16,18 @@ end
 
 
 "equal time Green function"
-function Gτ(model::_Hubbard_Para,s::Array{Int8,2},τ::Int64)::Array{ComplexF64,2}
+# ::Array{ComplexF64,2}
+function Gτ(model::_Hubbard_Para,s::Array{Int8,2},τ::Int64)
     BL::Array{ComplexF64,2}=model.Pt'[:,:]
     BR::Array{ComplexF64,2}=model.Pt[:,:]
 
     counter=0
     for i in model.Nt:-1:τ+1
-        D=model.K[:,:]
+        D=zeros(ComplexF64,model.Ns,model.Ns)
         for k in 1:size(s)[2]
             x,y=model.nnidx[k].I
-            D[x,y]*=s[i,k]*1im/2
-            D[y,x]*=-s[i,k]*1im/2
+            D[x,y]=s[i,k]*1im/2
+            D[y,x]=-s[i,k]*1im/2
         end
         E,V=eigen(D)
         BL=BL*V*diagm(exp.(model.α.*E))*V'*model.eK
@@ -39,11 +39,11 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,2},τ::Int64)::Array{ComplexF64,
     end
     counter=0
     for i in 1:1:τ
-        D=model.K[:,:]
+        D=zeros(ComplexF64,model.Ns,model.Ns)
         for k in 1:size(s)[2]
             x,y=model.nnidx[k].I
-            D[x,y]*=s[i,k]*1im/2
-            D[y,x]*=-s[i,k]*1im/2
+            D[x,y]=s[i,k]*1im/2
+            D[y,x]=-s[i,k]*1im/2
         end
         E,V=eigen(D)
         BR=V*diagm(exp.(model.α.*E))*V'*model.eK*BR
@@ -58,6 +58,7 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,2},τ::Int64)::Array{ComplexF64,
     BR=Matrix(qr(BR).Q)
 
     return I(model.Ns)-BR*inv(BL*BR)*BL
+    # return BL,BR
 end
 
 
@@ -77,15 +78,12 @@ function G4(model::_Hubbard_Para,s::Array{Int8,2},τ1::Int64,τ2::Int64)
         counter=0
         for i in 1:τ2
             D=zeros(ComplexF64,model.Ns,model.Ns)
-            for x in 1:size(s)[2]
-                xidx=2*x-1
-                nnidx=findall(model.K[xidx,:].!=0)
-                for k in 1:size(s)[3]
-                    D[xidx,nnidx[k]]=s[i,x,k]*1im
-                    D[nnidx[k],xidx]=-s[i,x,k]*1im
-                end
+            for k in 1:size(s)[2]
+                x,y=model.nnidx[k].I
+                D[x,y]=s[i,k]*1im/2
+                D[y,x]=-s[i,k]*1im/2
             end
-            E,V=eigen(D/2)
+            E,V=eigen(D)
             UR[1,:,:]=V*diagm(exp.(model.α.*E))*V'*model.eK*UR[1,:,:]
             counter+=1
             if counter==model.BatchSize
@@ -98,15 +96,12 @@ function G4(model::_Hubbard_Para,s::Array{Int8,2},τ1::Int64,τ2::Int64)
         counter=0
         for i in model.Nt:-1:τ1+1
             D=zeros(ComplexF64,model.Ns,model.Ns)
-            for x in 1:size(s)[2]
-                xidx=2*x-1
-                nnidx=findall(model.K[xidx,:].!=0)
-                for k in 1:size(s)[3]
-                    D[xidx,nnidx[k]]=s[i,x,k]*1im
-                    D[nnidx[k],xidx]=-s[i,x,k]*1im
-                end
+            for k in 1:size(s)[2]
+                x,y=model.nnidx[k].I
+                D[x,y]=s[i,k]*1im/2
+                D[y,x]=-s[i,k]*1im/2
             end
-            E,V=eigen(D/2)
+            E,V=eigen(D)
             UL[end,:,:]=UL[end,:,:]*V*diagm(exp.(model.α.*E))*V'*model.eK
             counter+=1
             if counter==model.BatchSize
@@ -121,15 +116,12 @@ function G4(model::_Hubbard_Para,s::Array{Int8,2},τ1::Int64,τ2::Int64)
             BBsInv[i,:,:]=I(model.Ns)
             for j in 1:model.BatchSize
                 D=zeros(ComplexF64,model.Ns,model.Ns)
-                for x in 1:size(s)[2]
-                    xidx=2*x-1
-                    nnidx=findall(model.K[xidx,:].!=0)
-                    for k in 1:size(s)[3]
-                        D[xidx,nnidx[k]]=s[τ2+(i-1)*model.BatchSize+j,x,k]*1im
-                        D[nnidx[k],xidx]=-s[τ2+(i-1)*model.BatchSize+j,x,k]*1im
-                    end
+                for k in 1:size(s)[2]
+                    x,y=model.nnidx[k].I
+                    D[x,y]=s[τ2+(i-1)*model.BatchSize+j,k]*1im/2
+                    D[y,x]=-s[τ2+(i-1)*model.BatchSize+j,k]*1im/2
                 end
-                E,V=eigen(D/2)
+                E,V=eigen(D)
                 BBs[i,:,:]=V*diagm(exp.(model.α.*E))*V'*model.eK*BBs[i,:,:]
                 BBsInv[i,:,:]=BBsInv[i,:,:]*model.eKinv*V*diagm(exp.(-model.α.*E))*V'
             end
@@ -139,15 +131,12 @@ function G4(model::_Hubbard_Para,s::Array{Int8,2},τ1::Int64,τ2::Int64)
         BBsInv[end,:,:]=I(model.Ns)
         for j in τ2+(size(BBs)[1]-1)*model.BatchSize+1:τ1
             D=zeros(ComplexF64,model.Ns,model.Ns)
-            for x in 1:size(s)[2]
-                xidx=2*x-1
-                nnidx=findall(model.K[xidx,:].!=0)
-                for k in 1:size(s)[3]
-                    D[xidx,nnidx[k]]=s[j,x,k]*1im
-                    D[nnidx[k],xidx]=-s[j,x,k]*1im
-                end
+            for k in 1:size(s)[2]
+                x,y=model.nnidx[k].I
+                D[x,y]=s[j,k]*1im/2
+                D[y,x]=-s[j,k]*1im/2
             end
-            E,V=eigen(D/2)
+            E,V=eigen(D)
             BBs[end,:,:]=V*diagm(exp.(model.α.*E))*V'*model.eK*BBs[end,:,:]
             BBsInv[end,:,:]=BBsInv[end,:,:]*model.eKinv*V*diagm(exp.(-model.α.*E))*V'
         end
@@ -210,15 +199,12 @@ function G12FF(model,s,τ1,τ2)
         for i in τ2+1:τ1
             # D=[model.η[x] for x in s[:,i]]
             D=zeros(ComplexF64,model.Ns,model.Ns)
-            for x in 1:size(s)[2]
-                xidx=2*x-1
-                nnidx=findall(model.K[xidx,:].!=0)
-                for k in 1:size(s)[3]
-                    D[xidx,nnidx[k]]=s[i,x,k]*1im
-                    D[nnidx[k],xidx]=-s[i,x,k]*1im
-                end
+            for k in 1:size(s)[2]
+                x,y=model.nnidx[k].I
+                D[x,y]=s[i,k]*1im/2
+                D[y,x]=-s[i,k]*1im/2
             end
-            E,V=eigen(D/2)
+            E,V=eigen(D)
             BBs=V*diagm(exp.(model.α.*E))*V'*model.eK*BBs
             BBsInv=BBsInv*model.eKinv*V*diagm(exp.(-model.α.*E))*V'
         end
