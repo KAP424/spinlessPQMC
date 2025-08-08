@@ -9,7 +9,7 @@ struct _Hubbard_Para
     Θ::Float64
     Ns::Int64
     Nt::Int64
-    K::Array{ComplexF64,2}
+    K::Array{Float64,2}
     BatchSize::Int64
     WrapTime::Int64
     Δt::Float64
@@ -19,8 +19,10 @@ struct _Hubbard_Para
     eK::Array{ComplexF64,2}
     HalfeKinv::Array{ComplexF64,2}
     eKinv::Array{ComplexF64,2}
-    nnidx::Vector{CartesianIndex{2}}
+    nnidx::Matrix{Tuple{Int64, Int64}}
+    UV::Array{ComplexF64, 3}
 end
+
 
 
 function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
@@ -32,9 +34,47 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     K=K_Matrix(Lattice,site)
     H0=1im*UpperTriangular(K_Matrix(Lattice,site))
     H0=(H0+H0')/2
-    Ns::Int64=size(K)[1]
-
-    nnidx=findall(UpperTriangular(K).!=0)
+    Ns=size(K)[1]
+    if Lattice=="SQUARE"
+        Ns=prod(site)
+        if length(site)==1
+            nnidx=fill((0, 0), div(Ns,2), 2)
+            count=1
+            for i in 1:2:Ns
+                nn=nn2idx(Lattice,site,i)
+                for j in eachindex(nn)
+                    nnidx[count,j]=(i,nn[j])
+                end
+                count+=1
+            end
+        elseif length(site)==2
+            nnidx=fill((0, 0), div(Ns,2), 4)
+            count=1
+            for x in 1:site[1]
+                for y in 1:site[2]
+                    if (x+y)%2==1
+                        i=x+(y-1)*site[1]
+                        nn=nn2idx(Lattice,site,i)
+                        for j in eachindex(nn)
+                            nnidx[count,j]=(i,nn[j])
+                        end
+                        count+=1
+                    end
+                end
+            end
+        end
+    elseif  Lattice=="HoneyComb"
+        Ns=prod(site)*2
+        nnidx=fill((0, 0), div(Ns,2), 3)
+        count=1
+        for i in 1:2:Ns
+            nn=nn2idx(Lattice,site,i)
+            for j in eachindex(nn)
+                nnidx[count,j]=(i,nn[j])
+            end
+            count+=1
+        end
+    end
     # 交错化学势，打开gap，去兼并
     # μ=0.0
     # if Lattice=="HoneyComb"
@@ -63,7 +103,24 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
         end
     end
 
-    return _Hubbard_Para(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,WrapTime,Δt,α,Pt,HalfeK,eK,HalfeKinv,eKinv,nnidx)
+    a,b=size(nnidx)
+    s=ones(Int8,Nt,a,b)
+    V=zeros(ComplexF64,3,Ns,Ns)
+    lt=1
+    for i in 1:size(s)[2]
+        for j in 1:size(s)[3]
+            x,y=nnidx[i,j]
+            V[j,x,y]=s[lt,i,j]*1im/2
+            V[j,y,x]=-s[lt,i,j]*1im/2
+        end
+    end
+    UV=zeros(ComplexF64,3,Ns,Ns)
+    for i in 1:size(UV)[1]
+        _,UV[i,:,:]=eigen(V[i,:,:])
+        UV[i,:,:]=UV[i,:,:]'
+    end 
+
+    return _Hubbard_Para(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,WrapTime,Δt,α,Pt,HalfeK,eK,HalfeKinv,eKinv,nnidx,UV)
 
 end
 
