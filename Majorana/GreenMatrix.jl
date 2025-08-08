@@ -27,14 +27,14 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)
 
     counter=0
     for lt in model.Nt:-1:τ+1
-        V=zeros(ComplexF64,size(s)[3],model.Ns,model.Ns)
+        V=zeros(ComplexF64,model.Ns,model.Ns)
         for j in 1:size(s)[3]
             for i in 1:size(s)[2]
                 x,y=model.nnidx[i,j]
-                V[j,x,y]=s[lt,i,j]*1im/2
-                V[j,y,x]=-s[lt,i,j]*1im/2
+                V[x,y]=s[lt,i,j]*1im/4
+                V[y,x]=-s[lt,i,j]*1im/4
             end
-            E=diag(model.UV[j,:,:]*V[j,:,:]*model.UV[j,:,:]')
+            E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
             BL=BL*model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
         end
         BL=BL*model.eK
@@ -46,15 +46,15 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)
     end
     counter=0
     for lt in 1:1:τ
-        V=zeros(ComplexF64,size(s)[3],model.Ns,model.Ns)
         BR=model.eK*BR
         for j in size(s)[3]:-1:1
+            V=zeros(ComplexF64,model.Ns,model.Ns)
             for i in 1:size(s)[2]
                 x,y=model.nnidx[i,j]
-                V[j,x,y]=s[lt,i,j]*1im/2
-                V[j,y,x]=-s[lt,i,j]*1im/2
+                V[x,y]=s[lt,i,j]*1im/4
+                V[y,x]=-s[lt,i,j]*1im/4
             end
-            E=diag(model.UV[j,:,:]*V[j,:,:]*model.UV[j,:,:]')
+            E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
             BR=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]*BR
         end
         counter+=1
@@ -90,8 +90,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,2},τ1::Int64,τ2::Int64)
             D=zeros(ComplexF64,model.Ns,model.Ns)
             for k in 1:size(s)[2]
                 x,y=model.nnidx[k].I
-                D[x,y]=s[i,k]*1im/2
-                D[y,x]=-s[i,k]*1im/2
+                D[x,y]=s[i,k]*1im/4
+                D[y,x]=-s[i,k]*1im/4
             end
             E,V=eigen(D)
             UR[1,:,:]=V*diagm(exp.(model.α.*E))*V'*model.eK*UR[1,:,:]
@@ -108,8 +108,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,2},τ1::Int64,τ2::Int64)
             D=zeros(ComplexF64,model.Ns,model.Ns)
             for k in 1:size(s)[2]
                 x,y=model.nnidx[k].I
-                D[x,y]=s[i,k]*1im/2
-                D[y,x]=-s[i,k]*1im/2
+                D[x,y]=s[i,k]*1im/4
+                D[y,x]=-s[i,k]*1im/4
             end
             E,V=eigen(D)
             UL[end,:,:]=UL[end,:,:]*V*diagm(exp.(model.α.*E))*V'*model.eK
@@ -128,8 +128,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,2},τ1::Int64,τ2::Int64)
                 D=zeros(ComplexF64,model.Ns,model.Ns)
                 for k in 1:size(s)[2]
                     x,y=model.nnidx[k].I
-                    D[x,y]=s[τ2+(i-1)*model.BatchSize+j,k]*1im/2
-                    D[y,x]=-s[τ2+(i-1)*model.BatchSize+j,k]*1im/2
+                    D[x,y]=s[τ2+(i-1)*model.BatchSize+j,k]*1im/4
+                    D[y,x]=-s[τ2+(i-1)*model.BatchSize+j,k]*1im/4
                 end
                 E,V=eigen(D)
                 BBs[i,:,:]=V*diagm(exp.(model.α.*E))*V'*model.eK*BBs[i,:,:]
@@ -143,8 +143,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,2},τ1::Int64,τ2::Int64)
             D=zeros(ComplexF64,model.Ns,model.Ns)
             for k in 1:size(s)[2]
                 x,y=model.nnidx[k].I
-                D[x,y]=s[j,k]*1im/2
-                D[y,x]=-s[j,k]*1im/2
+                D[x,y]=s[j,k]*1im/4
+                D[y,x]=-s[j,k]*1im/4
             end
             E,V=eigen(D)
             BBs[end,:,:]=V*diagm(exp.(model.α.*E))*V'*model.eK*BBs[end,:,:]
@@ -211,8 +211,8 @@ function G12FF(model,s,τ1,τ2)
             D=zeros(ComplexF64,model.Ns,model.Ns)
             for k in 1:size(s)[2]
                 x,y=model.nnidx[k].I
-                D[x,y]=s[i,k]*1im/2
-                D[y,x]=-s[i,k]*1im/2
+                D[x,y]=s[i,k]*1im/4
+                D[y,x]=-s[i,k]*1im/4
             end
             E,V=eigen(D)
             BBs=V*diagm(exp.(model.α.*E))*V'*model.eK*BBs

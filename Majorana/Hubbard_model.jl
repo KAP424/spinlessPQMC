@@ -29,11 +29,11 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     Nt::Int64=2*cld(Θ,Δt)
     WrapTime::Int64=div(BatchSize,2)
     
-    α::Float64=acos(exp(-Δt*U/2)) 
+    α::Float64=acosh(exp(Δt*U/2)) 
     
     K=K_Matrix(Lattice,site)
-    H0=1im*UpperTriangular(K_Matrix(Lattice,site))
-    H0=(H0+H0')/2
+    H0=t*1im*UpperTriangular(K)
+    H0=(H0+H0')/4
     Ns=size(K)[1]
     if Lattice=="SQUARE"
         Ns=prod(site)
@@ -88,7 +88,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     # K[K .!= 0] .+=( rand(size(K)...) * 0.1)[K.!= 0]
     # K=(K+K')./2
 
-    E,V=eigen(t*H0)
+    E,V=eigen(H0)
     HalfeK=V*diagm(exp.(-Δt.*E./2))*V'
     eK=V*diagm(exp.(-Δt.*E))*V'
     HalfeKinv=V*diagm(exp.(Δt.*E./2))*V'
@@ -105,20 +105,19 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
 
     a,b=size(nnidx)
     s=ones(Int8,Nt,a,b)
-    V=zeros(ComplexF64,3,Ns,Ns)
-    lt=1
-    for i in 1:size(s)[2]
-        for j in 1:size(s)[3]
-            x,y=nnidx[i,j]
-            V[j,x,y]=s[lt,i,j]*1im/2
-            V[j,y,x]=-s[lt,i,j]*1im/2
-        end
-    end
     UV=zeros(ComplexF64,3,Ns,Ns)
-    for i in 1:size(UV)[1]
-        _,UV[i,:,:]=eigen(V[i,:,:])
-        UV[i,:,:]=UV[i,:,:]'
-    end 
+    
+    lt=1
+    for j in 1:size(s)[3]
+        V=zeros(ComplexF64,Ns,Ns)
+        for i in 1:size(s)[2]
+            x,y=nnidx[i,j]
+            V[x,y]=s[lt,i,j]*1im/4
+            V[y,x]=-s[lt,i,j]*1im/4
+        end
+        _,UV[j,:,:]=eigen(V)
+        UV[j,:,:]=UV[j,:,:]'
+    end
 
     return _Hubbard_Para(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,WrapTime,Δt,α,Pt,HalfeK,eK,HalfeKinv,eKinv,nnidx,UV)
 

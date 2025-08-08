@@ -19,7 +19,20 @@ s=Initial_s(model,rng)
 
 path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
 s=phy_update(path,model,s,1,true)
+for k in 1:length(model.nnidx)
+    x,y=model.nnidx[k]
+    println(x," ",y)
+end
 
+G=Gτ(model,s,div(model.Nt,2))
+
+diag(G)
+
+-model.U*sum(G.*conj.(G).*model.K)
+
+H0=model.t*1im*UpperTriangular(model.K)
+H0=(H0+H0')/2
+Ek=2*real(sum(H0.*G))
 # ------------------------------------------------------------------------
 # TEST for Green function
 # println(size(s))
@@ -300,39 +313,3 @@ s=phy_update(path,model,s,1,true)
 # end
 
 # # ------------------------------------------------------------------------
-
-# # BL,BR=Gτ(model,s,i)
-# # BL_,BR_=Gτ(model,ss,i)
-# # norm(BL-BL_)
-# # ΔΔ=zeros(ComplexF64,model.Ns,model.Ns)
-# # ΔΔ[subidx,subidx]=Δ
-# # norm( (I(model.Ns)+ΔΔ)*BR -BR_   )
-
-# # norm(ΔΔ-Δ1)
-
-# E,V=eigen(D)
-# EV1=V*diagm(exp.(model.α*E))*V'
-# E,V=eigen(DD)
-# EV2=V*diagm(exp.(model.α*E))*V'
-# norm(EV1*EV2-EV2*EV1)
-
-# ΔΔ =EV2/EV1-I(model.Ns)
-# rr=I(model.Ns)+ΔΔ*(I(model.Ns)-G)
-
-# norm((I(model.Ns)+ΔΔ)*EV1-EV2)
-
-# G3=G-(G/rr*ΔΔ*((I(model.Ns)-G)))
-
-# norm(G3-GG)
-
-
-
-# ΔΔ
-# for iii in 1:size(ΔΔ)[1]
-#     for jjj in 1:size(ΔΔ)[2]
-#         if abs(ΔΔ[iii,jjj])<1e-5
-#             ΔΔ[iii,jjj]=0
-#         end
-#     end
-# end
-# ΔΔ

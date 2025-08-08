@@ -9,10 +9,10 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
     file="$(path)M_PHY$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)BS$(model.BatchSize).csv"
 
     rng=MersenneTwister(Threads.threadid())
-    sg=R0=R1=Ek=Ev=0
+    R0=R1=Ek=Ev=0
     counter=0
 
-    V=zeros(ComplexF64,3,model.Ns,model.Ns)
+    
     G=zeros(Float64,model.Ns,model.Ns)
     for loop in 1:Sweeps
         for lt in 0:model.Nt-1
@@ -31,18 +31,19 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
             
 
             for j in size(s)[3]:-1:1
+                V=zeros(ComplexF64,model.Ns,model.Ns)
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
-                    V[j,x,y]=s[lt+1,i,j]*1im/2
-                    V[j,y,x]=-s[lt+1,i,j]*1im/2
+                    V[x,y]=s[lt+1,i,j]*1im/4
+                    V[y,x]=-s[lt+1,i,j]*1im/4
                 end
-                E=diag(model.UV[j,:,:]*V[j,:,:]*model.UV[j,:,:]')
+                E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
                 G=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:] *G* model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:]
                 
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
                     subidx=[x,y]
-                    Δ=[0 -1im*s[lt+1,i,j]; 1im*s[lt+1,i,j] 0]
+                    Δ=[0 -1im/2*s[lt+1,i,j]; 1im/2*s[lt+1,i,j] 0]
                     E,U=eigen(Δ)
                     Δ=U*diagm(exp.(model.α*E))*U'-I(2)
                     r=I(2)+Δ*(I(2)-G[subidx,subidx])
@@ -55,14 +56,14 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                         #####################################################################
                         ss=copy(s)
                         GG=model.eK*Gτ(model,ss,lt)*model.eKinv
-                        VV=zeros(ComplexF64,3,model.Ns,model.Ns)
+                        VV=zeros(ComplexF64,model.Ns,model.Ns)
                         for jj in size(s)[3]:-1:j
                             for ii in 1:size(s)[2]
                                 x,y=model.nnidx[ii,jj]
-                                VV[jj,x,y]=ss[lt+1,ii,jj]*1im/2
-                                VV[jj,y,x]=-ss[lt+1,ii,jj]*1im/2
+                                VV[x,y]=ss[lt+1,ii,jj]*1im/4
+                                VV[y,x]=-ss[lt+1,ii,jj]*1im/4
                             end
-                            E=diag(model.UV[jj,:,:]*VV[jj,:,:]*model.UV[jj,:,:]')
+                            E=diag(model.UV[jj,:,:]*VV*model.UV[jj,:,:]')
                             GG=model.UV[jj,:,:]'*diagm(exp.(model.α*E))*model.UV[jj,:,:] *GG* model.UV[jj,:,:]'*diagm(exp.(-model.α*E))*model.UV[jj,:,:]
                         end
 
@@ -76,56 +77,13 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                 end
             end
 
-           
-            if abs(lt+1-model.Nt/2)<=model.WrapTime
-                G0=G[:,:]
-                if lt+1>model.Nt/2
-                    for t in lt+1:-1:div(model.Nt,2)+1
-                        for j in 1:size(s)[3]
-                            for i in 1:size(s)[2]
-                                x,y=model.nnidx[i,j]
-                                V[j,x,y]=s[t,i,j]*1im/2
-                                V[j,y,x]=-s[t,i,j]*1im/2
-                            end
-                            E=diag(model.UV[j,:,:]*V[j,:,:]*model.UV[j,:,:]')
-                            G0=model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
-                        end
-                        G0= model.eKinv*G0*model.eK
-                    end
-                else
-                    for t in lt+2:div(model.Nt,2)
-                        G0=model.eK*G0*model.eKinv
-                        for j in size(s)[3]:-1:1
-                            # j=3
-                            for i in 1:size(s)[2]
-                                x,y=model.nnidx[i,j]
-                                V[j,x,y]=s[t,i,j]*1im/2
-                                V[j,y,x]=-s[t,i,j]*1im/2
-                            end
-                            E=diag(model.UV[j,:,:]*V[j,:,:]*model.UV[j,:,:]')
-                            G0=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:]
-                        end
-                    end
-                end
-                #####################################################################
-                if norm(G0-Gτ(model,s,div(model.Nt,2)))>1e-6 
-                    error("record error")
-                end
-                #####################################################################
-                G0=model.HalfeK* G0 *model.HalfeKinv
-                ##------------------------------------------------------------------------
-                # tmp=Magnetism(model,G0)
-                # mA+=tmp[1]
-                # mB+=tmp[2]
-                # nn+=NN(model,G0)
-                # Ek+=EK(model,G0)
-                # tmp=CzzofSpin(model,G0)
-                # R0+=tmp[1]
-                # R1+=tmp[2]
-                # C0+=tmp[3]
-                # Cmax+=tmp[4]
+            if record && abs(lt+1-model.Nt/2)<=model.WrapTime
+                tmp=phy_measure(model,G,lt+1,s)
+                # Ek+=tmp[1]
+                # Ev+=tmp[2]
+                # R0+=tmp[3]
+                # R1+=tmp[4]
                 # counter+=1
-                ##------------------------------------------------------------------------
             end
         end
 
@@ -145,7 +103,7 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
                     subidx=[x,y]
-                    Δ=[0 -1im*s[lt,i,j]; 1im*s[lt,i,j] 0]
+                    Δ=[0 -1im/2*s[lt,i,j]; 1im/2*s[lt,i,j] 0]
                     E,U=eigen(Δ)
                     Δ=U*diagm(exp.(model.α*E))*U'-I(2)
                     r=I(2)+Δ*(I(2)-G[subidx,subidx])
@@ -159,14 +117,14 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                         #####################################################################
                         ss=copy(s)
                         GG=Gτ(model,ss,lt)
-                        VV=zeros(ComplexF64,3,model.Ns,model.Ns)
+                        VV=zeros(ComplexF64,model.Ns,model.Ns)
                         for jj in 1:j-1
                             for ii in 1:size(s)[2]
                                 x,y=model.nnidx[ii,jj]
-                                VV[jj,x,y]=ss[lt,ii,jj]*1im/2
-                                VV[jj,y,x]=-ss[lt,ii,jj]*1im/2
+                                VV[x,y]=ss[lt,ii,jj]*1im/4
+                                VV[y,x]=-ss[lt,ii,jj]*1im/4
                             end
-                            E=diag(model.UV[jj,:,:]*VV[jj,:,:]*model.UV[jj,:,:]')
+                            E=diag(model.UV[jj,:,:]*VV*model.UV[jj,:,:]')
                             GG=model.UV[jj,:,:]'*diagm(exp.(-model.α*E))*model.UV[jj,:,:] *GG* model.UV[jj,:,:]'*diagm(exp.(model.α*E))*model.UV[jj,:,:]
                         end
             
@@ -176,76 +134,33 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                         #####################################################################
                     end
                 end
-            
+                V=zeros(ComplexF64,model.Ns,model.Ns)
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
-                    V[j,x,y]=s[lt,i,j]*1im/2
-                    V[j,y,x]=-s[lt,i,j]*1im/2
+                    V[x,y]=s[lt,i,j]*1im/4
+                    V[y,x]=-s[lt,i,j]*1im/4
                 end
-                E=diag(model.UV[j,:,:]*V[j,:,:]*model.UV[j,:,:]')
+                E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
                 G=model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:] *G* model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
             end
             G=model.eKinv*G*model.eK
 
-            
-            if abs(lt-1-model.Nt/2)<=model.WrapTime
-                G0=G[:,:]
-                if lt-1>model.Nt/2
-                    for t in lt-1:-1:div(model.Nt,2)+1
-                        for j in 1:size(s)[3]
-                            for i in 1:size(s)[2]
-                                x,y=model.nnidx[i,j]
-                                V[j,x,y]=s[t,i,j]*1im/2
-                                V[j,y,x]=-s[t,i,j]*1im/2
-                            end
-                            E=diag(model.UV[j,:,:]*V[j,:,:]*model.UV[j,:,:]')
-                            G0=model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
-                        end
-                        G0= model.eKinv*G0*model.eK
-                    end
-                else
-                    for t in lt:div(model.Nt,2)
-                        G0=model.eK*G0*model.eKinv
-                        for j in size(s)[3]:-1:1
-                            for i in 1:size(s)[2]
-                                x,y=model.nnidx[i,j]
-                                V[j,x,y]=s[t,i,j]*1im/2
-                                V[j,y,x]=-s[t,i,j]*1im/2
-                            end
-                            E=diag(model.UV[j,:,:]*V[j,:,:]*model.UV[j,:,:]')
-                            G0=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:]
-                        end
-                    end
-                end
-                #####################################################################
-                if norm(G0-Gτ(model,s,div(model.Nt,2)))>1e-6 
-                    error("record error")
-                end
-                #####################################################################
-                G0=model.HalfeK* G0 *model.HalfeKinv
-                ##------------------------------------------------------------------------
-                # tmp=Magnetism(model,G0)
-                # mA+=tmp[1]
-                # mB+=tmp[2]
-                # nn+=NN(model,G0)
-                # Ek+=EK(model,G0)
-                # tmp=CzzofSpin(model,G0)
-                # R0+=tmp[1]
-                # R1+=tmp[2]
-                # C0+=tmp[3]
-                # Cmax+=tmp[4]
+            if record && abs(lt-1-model.Nt/2)<=model.WrapTime
+                tmp=phy_measure(model,G,lt-1,s)
+                # Ek+=tmp[1]
+                # Ev+=tmp[2]
+                # R0+=tmp[3]
+                # R1+=tmp[4]
                 # counter+=1
-                ##------------------------------------------------------------------------
             end
-
         end
         if record
             open(file, "a") do io
                 lock(io)
-                writedlm(io,[sg Ek Ev R0 R1]/counter,',')
+                writedlm(io,[Ek Ev R0 R1]/counter,',')
                 unlock(io)
             end
-            sg=R0=R1=Ek=Ev=0
+            R0=R1=Ek=Ev=0
             counter=0
         end
     end
@@ -254,78 +169,91 @@ end
 
 function phy_measure(model,G,lt,s)
     G0=G[:,:]
+    
     if lt>model.Nt/2
-        for i in lt:-1:div(model.Nt,2)+1
-            D=zeros(model.Ns)
-            for k in 1:size(s)[2]
-                x,y=model.nnidx[k].I
-                D[x]+=s[i,k]
-                D[y]-=s[i,k]
+        for t in lt:-1:div(model.Nt,2)+1
+            for j in 1:size(s)[3]
+                V=zeros(ComplexF64,model.Ns,model.Ns)
+                for i in 1:size(s)[2]
+                    x,y=model.nnidx[i,j]
+                    V[x,y]=s[t,i,j]*1im/4
+                    V[y,x]=-s[t,i,j]*1im/4
+                end
+                E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
+                G0=model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
             end
-            G0= model.eKinv*diagm(exp.(-model.α.*D)) *G0*  diagm(exp.(model.α.*D))*model.eK
+            G0= model.eKinv*G0*model.eK
         end
     else
-        for i in lt+1:div(model.Nt,2)
-            D=zeros(model.Ns)
-            for k in 1:size(s)[2]
-                x,y=model.nnidx[k].I
-                D[x]+=s[i,k]
-                D[y]-=s[i,k]
+        for t in lt+1:div(model.Nt,2)
+            G0=model.eK*G0*model.eKinv
+            for j in size(s)[3]:-1:1
+                V=zeros(ComplexF64,model.Ns,model.Ns)
+                for i in 1:size(s)[2]
+                    x,y=model.nnidx[i,j]
+                    V[x,y]=s[t,i,j]*1im/4
+                    V[y,x]=-s[t,i,j]*1im/4
+                end
+                E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
+                G0=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:]
             end
-            G0=diagm(exp.(model.α.*D))*model.eK *G0* model.eKinv*diagm(exp.(-model.α.*D))  
         end
     end
     #####################################################################
-    if norm(G0-Gτ(model,s,div(model.Nt,2)))>1e-4 
-        println("record error:",norm(G0-Gτ(model,s,div(model.Nt,2))))
+    if norm(G0-Gτ(model,s,div(model.Nt,2)))>1e-6 
+        error("record error")
     end
     #####################################################################
 
     G0=model.HalfeK* G0 *model.HalfeKinv
 
-    Ek=model.t*sum(model.K.*G0)
+    H0=model.t*1im*UpperTriangular(model.K)
+    H0=(H0+H0')/2
+    Ek=2*real(sum(H0.*G0))
+
     Ev=R0=R1=0
     for k in 1:length(model.nnidx)
-        x,y=model.nnidx[k].I
+        x,y=model.nnidx[k]
         Ev+=(1-G0[x,x])*(1-G0[y,y])-G0[x,y]*G0[y,x]-1/4
     end
-    Ev*=model.U
-    if model.Lattice=="HoneyComb"
-        for rx in 1:model.site[1]
-            for ry in 1:model.site[2]
-                tmp=0
-                for ix in 1:model.site[1]
-                    for iy in 1:model.site[2]
-                        idx1=2*( (iy-1)*model.site[1]+ix) -1
-                        idx2=2*( mod(iy+ry-1,model.site[2])*model.site[1]+mod1(ix+rx,model.site[1]) )-1
-                        tmp+=(1-G0[idx1,idx1])*(1-G0[idx2,idx2])-G0[idx1,idx2]*G0[idx2,idx1]
-                        tmp+=(1-G0[idx1+1,idx1+1])*(1-G0[idx2+1,idx2+1])-G0[idx1+1,idx2+1]*G[idx2+1,idx1+1]
-                        tmp-=(1-G0[idx1+1,idx1+1])*(1-G0[idx2,idx2])-G0[idx1+1,idx2]*G0[idx2,idx1+1]
-                        tmp-=(1-G0[idx1,idx1])*(1-G0[idx2+1,idx2+1])-G0[idx1,idx2+1]*G0[idx2+1,idx1]
-                    end
-                end
-                tmp/=prod(model.site)
-                R0+=tmp
-                R1+=cos(2*π/model.site[1]*rx+2*π/model.site[2]*ry)*tmp
-            end
-        end
-    elseif model.Lattice=="SQUARE"
-        for rx in 1:model.site[1]
-            for ry in 1:model.site[2]
-                tmp=0
-                for ix in 1:model.site[1]
-                    for iy in 1:model.site[2]
-                        idx1=ix+(iy-1)*model.site[1]
-                        idx2=mod1(rx+ix,model.site[1])+mod((ry+iy-1),model.site[2])*model.site[1]
-                        tmp+=(1-G0[idx1,idx1])*(1-G0[idx2,idx2])-G0[idx1,idx2]*G0[idx2,idx1]
-                    end
-                end
-                tmp/=prod(model.site)
-                R0+=tmp*cos(π*(rx+ry))
-                R1+=cos(π*(rx+ry)+2*π/model.site[1]*rx+2*π/model.site[2]*ry )*tmp
-            end
-        end
-    end
+    # Ev*=model.U
+    # if model.Lattice=="HoneyComb"
+    #     for rx in 1:model.site[1]
+    #         for ry in 1:model.site[2]
+    #             tmp=0
+    #             for ix in 1:model.site[1]
+    #                 for iy in 1:model.site[2]
+    #                     idx1=2*( (iy-1)*model.site[1]+ix) -1
+    #                     idx2=2*( mod(iy+ry-1,model.site[2])*model.site[1]+mod1(ix+rx,model.site[1]) )-1
+    #                     tmp+=(1-G0[idx1,idx1])*(1-G0[idx2,idx2])-G0[idx1,idx2]*G0[idx2,idx1]
+    #                     tmp+=(1-G0[idx1+1,idx1+1])*(1-G0[idx2+1,idx2+1])-G0[idx1+1,idx2+1]*G[idx2+1,idx1+1]
+    #                     tmp-=(1-G0[idx1+1,idx1+1])*(1-G0[idx2,idx2])-G0[idx1+1,idx2]*G0[idx2,idx1+1]
+    #                     tmp-=(1-G0[idx1,idx1])*(1-G0[idx2+1,idx2+1])-G0[idx1,idx2+1]*G0[idx2+1,idx1]
+    #                 end
+    #             end
+    #             tmp/=prod(model.site)
+    #             R0+=tmp
+    #             R1+=cos(2*π/model.site[1]*rx+2*π/model.site[2]*ry)*tmp
+    #         end
+    #     end
+    # elseif model.Lattice=="SQUARE"
+    #     for rx in 1:model.site[1]
+    #         for ry in 1:model.site[2]
+    #             tmp=0
+    #             for ix in 1:model.site[1]
+    #                 for iy in 1:model.site[2]
+    #                     idx1=ix+(iy-1)*model.site[1]
+    #                     idx2=mod1(rx+ix,model.site[1])+mod((ry+iy-1),model.site[2])*model.site[1]
+    #                     tmp+=(1-G0[idx1,idx1])*(1-G0[idx2,idx2])-G0[idx1,idx2]*G0[idx2,idx1]
+    #                 end
+    #             end
+    #             tmp/=prod(model.site)
+    #             R0+=tmp*cos(π*(rx+ry))
+    #             R1+=cos(π*(rx+ry)+2*π/model.site[1]*rx+2*π/model.site[2]*ry )*tmp
+    #         end
+    #     end
+    # end
     # 1-R1/R0
-    return Ek,Ev,R0,R1
+    return 0,0,0,0 
+    # return Ek,Ev,R0,R1
 end
