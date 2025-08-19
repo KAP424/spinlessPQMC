@@ -14,13 +14,13 @@ struct _Hubbard_Para
     WrapTime::Int64
     Δt::Float64
     α::Float64
-    Pt::Array{ComplexF64,2}
-    HalfeK::Array{ComplexF64,2}
-    eK::Array{ComplexF64,2}
-    HalfeKinv::Array{ComplexF64,2}
-    eKinv::Array{ComplexF64,2}
+    Pt::Array{Float64,2}
+    HalfeK::Array{Float64,2}
+    eK::Array{Float64,2}
+    HalfeKinv::Array{Float64,2}
+    eKinv::Array{Float64,2}
     nnidx::Matrix{Tuple{Int64, Int64}}
-    UV::Array{ComplexF64, 3}
+    UV::Array{Float64, 3}
 end
 
 
@@ -32,8 +32,6 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     α::Float64=acosh(exp(Δt*U/2)) 
     
     K=K_Matrix(Lattice,site)
-    H0=t*1im*UpperTriangular(K)
-    H0=(H0+H0')/4
     Ns=size(K)[1]
     if Lattice=="SQUARE"
         Ns=prod(site)
@@ -88,7 +86,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     # K[K .!= 0] .+=( rand(size(K)...) * 0.1)[K.!= 0]
     # K=(K+K')./2
 
-    E,V=eigen(H0)
+    E,V=eigen(-t.*K)
     HalfeK=V*diagm(exp.(-Δt.*E./2))*V'
     eK=V*diagm(exp.(-Δt.*E))*V'
     HalfeKinv=V*diagm(exp.(Δt.*E./2))*V'
@@ -105,23 +103,25 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
 
     a,b=size(nnidx)
     s=ones(Int8,Nt,a,b)
-    UV=zeros(ComplexF64,b,Ns,Ns)
+    UV=zeros(Float64,b,Ns,Ns)
     
     lt=1
     for j in 1:size(s)[3]
-        V=zeros(ComplexF64,Ns,Ns)
+        V=zeros(Float64,Ns,Ns)
         for i in 1:size(s)[2]
             x,y=nnidx[i,j]
-            V[x,y]=s[lt,i,j]*1im/4
-            V[y,x]=-s[lt,i,j]*1im/4
+            V[x,y]=V[y,x]=s[lt,i,j]
         end
         _,UV[j,:,:]=eigen(V)
         UV[j,:,:]=UV[j,:,:]'
     end
 
+    
+
     return _Hubbard_Para(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,WrapTime,Δt,α,Pt,HalfeK,eK,HalfeKinv,eKinv,nnidx,UV)
 
 end
+
 
 
 # function setμ(model::_Hubbard_Para,μ)
@@ -135,4 +135,3 @@ end
 #     E,V=eigen(model.K)
 #     model.Pt=V[:,1:N_particle]
 # end
-

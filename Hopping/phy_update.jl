@@ -1,12 +1,13 @@
 # Trotter e^V1 e^V2 e^V3 e^K
 
 function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::Int64,record::Bool)
+    uv=[-2^0.5/2 -2^0.5/2;-2^0.5/2 2^0.5/2]
     if model.Lattice=="SQUARE"
         name="□"
     elseif model.Lattice=="HoneyComb"
         name="HC"
     end
-    file="$(path)M_PHY$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)BS$(model.BatchSize).csv"
+    file="$(path)H_phy$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)BS$(model.BatchSize).csv"
 
     rng=MersenneTwister(Threads.threadid())
     R0=R1=Ek=Ev=0
@@ -28,52 +29,62 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                 G=model.eK*G*model.eKinv
             end
             
-            
 
             for j in size(s)[3]:-1:1
-                V=zeros(ComplexF64,model.Ns,model.Ns)
+                V=zeros(Float64,model.Ns,model.Ns)
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
-                    V[x,y]=s[lt+1,i,j]*1im/4
-                    V[y,x]=-s[lt+1,i,j]*1im/4
+                    V[x,y]=V[y,x]=s[lt+1,i,j]
                 end
+                #####################################################################
+                tmp=model.UV[j,:,:]*V*model.UV[j,:,:]'
+                if norm(tmp-diagm(diag(tmp)))>1e-6
+                    println("diagnose error")
+                end
+                #####################################################################
                 E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
                 G=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:] *G* model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:]
                 
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
                     subidx=[x,y]
-                    Δ=[0 -1im/2*s[lt+1,i,j]; 1im/2*s[lt+1,i,j] 0]
-                    E,U=eigen(Δ)
-                    Δ=U*diagm(exp.(model.α*E))*U'-I(2)
+                    Δ=[0 -2*s[lt+1,i,j]; -2*s[lt+1,i,j] 0]
+                    E=diag(uv*Δ*uv')
+                    Δ=uv'*diagm(exp.(model.α*E))*uv-I(2)
                     r=I(2)+Δ*(I(2)-G[subidx,subidx])
-                    detR=abs(det(r))
+                    detR=det(r)
+                    if detR<0
+                        println("negative possibility! $(detR)")
+                    end
+                    #####################################################################
+                    ss=copy(s)
+                    ss[lt+1,i,j]=-ss[lt+1,i,j]
+                    dassda=abs(detR-Poss(model,ss)/Poss(model,s))
+                    println("Poss diff: $(dassda)")
+                    if abs(dassda)>1e-5
+                        error("Poss error: $(dassda)")
+                    end
+                    #####################################################################
 
-                    # println(detR)
                     if rand(rng)<detR
                         G-=(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:]))
                         s[lt+1,i,j]=-s[lt+1,i,j]
                         #####################################################################
-                        ss=copy(s)
                         GG=model.eK*Gτ(model,ss,lt)*model.eKinv
-                        VV=zeros(ComplexF64,model.Ns,model.Ns)
+                        VV=zeros(Float64,model.Ns,model.Ns)
                         for jj in size(s)[3]:-1:j
                             for ii in 1:size(s)[2]
                                 x,y=model.nnidx[ii,jj]
-                                VV[x,y]=ss[lt+1,ii,jj]*1im/4
-                                VV[y,x]=-ss[lt+1,ii,jj]*1im/4
+                                VV[x,y]=VV[y,x]=ss[lt+1,ii,jj]
                             end
                             E=diag(model.UV[jj,:,:]*VV*model.UV[jj,:,:]')
                             GG=model.UV[jj,:,:]'*diagm(exp.(model.α*E))*model.UV[jj,:,:] *GG* model.UV[jj,:,:]'*diagm(exp.(-model.α*E))*model.UV[jj,:,:]
                         end
-
                         if(norm(G-GG)>1e-4)
                             println(j," error: ",norm(G-GG),"  ",i)
                         end
                         #####################################################################
-
                     end
-
                 end
             end
 
@@ -103,12 +114,14 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
                     subidx=[x,y]
-                    Δ=[0 -1im/2*s[lt,i,j]; 1im/2*s[lt,i,j] 0]
-                    E,U=eigen(Δ)
-                    Δ=U*diagm(exp.(model.α*E))*U'-I(2)
+                    Δ=[0 -2*s[lt,i,j]; -2*s[lt,i,j] 0]
+                    E=diag(uv*Δ*uv')
+                    Δ=uv'*diagm(exp.(model.α*E))*uv-I(2)
                     r=I(2)+Δ*(I(2)-G[subidx,subidx])
-                    detR=abs(det(r))
-
+                    detR=(det(r))
+                    if detR<0
+                        println("negative possibility! $(detR)")
+                    end
                     # println(detR)
                     if rand(rng)<detR
                         G-=(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:]))
@@ -117,12 +130,11 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                         #####################################################################
                         ss=copy(s)
                         GG=Gτ(model,ss,lt)
-                        VV=zeros(ComplexF64,model.Ns,model.Ns)
+                        VV=zeros(Float64,model.Ns,model.Ns)
                         for jj in 1:j-1
                             for ii in 1:size(s)[2]
                                 x,y=model.nnidx[ii,jj]
-                                VV[x,y]=ss[lt,ii,jj]*1im/4
-                                VV[y,x]=-ss[lt,ii,jj]*1im/4
+                                VV[x,y]=VV[y,x]=ss[lt,ii,jj]
                             end
                             E=diag(model.UV[jj,:,:]*VV*model.UV[jj,:,:]')
                             GG=model.UV[jj,:,:]'*diagm(exp.(-model.α*E))*model.UV[jj,:,:] *GG* model.UV[jj,:,:]'*diagm(exp.(model.α*E))*model.UV[jj,:,:]
@@ -134,11 +146,10 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                         #####################################################################
                     end
                 end
-                V=zeros(ComplexF64,model.Ns,model.Ns)
+                V=zeros(Float64,model.Ns,model.Ns)
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
-                    V[x,y]=s[lt,i,j]*1im/4
-                    V[y,x]=-s[lt,i,j]*1im/4
+                    V[x,y]=V[y,x]=s[lt,i,j]
                 end
                 E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
                 G=model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:] *G* model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
@@ -167,17 +178,38 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
     return s
 end 
 
+
+function Poss(model,s)
+    BR=model.Pt[:,:]
+
+    for lt in 1:model.Nt
+        BR=model.eK*BR
+        for j in size(s)[3]:-1:1
+            V=zeros(Float64,model.Ns,model.Ns)
+            for i in 1:size(s)[2]
+                x,y=model.nnidx[i,j]
+                V[x,y]=V[y,x]=s[lt,i,j]
+            end
+            E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
+            BR=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]*BR
+        end
+    end
+
+    BR=model.Pt'*BR
+    return det(BR)
+end
+
+
 function phy_measure(model,G,lt,s)
     G0=G[:,:]
     
     if lt>model.Nt/2
         for t in lt:-1:div(model.Nt,2)+1
             for j in 1:size(s)[3]
-                V=zeros(ComplexF64,model.Ns,model.Ns)
+                V=zeros(Float64,model.Ns,model.Ns)
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
-                    V[x,y]=s[t,i,j]*1im/4
-                    V[y,x]=-s[t,i,j]*1im/4
+                    V[x,y]=V[y,x]=s[t,i,j]
                 end
                 E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
                 G0=model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
@@ -188,11 +220,10 @@ function phy_measure(model,G,lt,s)
         for t in lt+1:div(model.Nt,2)
             G0=model.eK*G0*model.eKinv
             for j in size(s)[3]:-1:1
-                V=zeros(ComplexF64,model.Ns,model.Ns)
+                V=zeros(Float64,model.Ns,model.Ns)
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
-                    V[x,y]=s[t,i,j]*1im/4
-                    V[y,x]=-s[t,i,j]*1im/4
+                    V[x,y]=V[y,x]=s[t,i,j]
                 end
                 E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
                 G0=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:]
@@ -207,9 +238,13 @@ function phy_measure(model,G,lt,s)
 
     G0=model.HalfeK* G0 *model.HalfeKinv
 
-    Ek=model.t*sqrt(sum(imag.(G0).* model.K))
-    Ev=model.U*sqrt(sum(imag.(G0).^2 .*model.K./2 .+1/4))
-    R0=R1=0
+    Ek=model.t*sum(model.K.*G0)
+    Ev=R0=R1=0
+    for k in 1:length(model.nnidx)
+        x,y=model.nnidx[k]
+        Ev+=(1-G0[x,x])*(1-G0[y,y])-G0[x,y]*G0[y,x]-1/4
+    end
+    Ev*=model.U
     if model.Lattice=="HoneyComb"
         for rx in 1:model.site[1]
             for ry in 1:model.site[2]
@@ -218,13 +253,13 @@ function phy_measure(model,G,lt,s)
                     for iy in 1:model.site[2]
                         idx1=2*( (iy-1)*model.site[1]+ix) -1
                         idx2=2*( mod(iy+ry-1,model.site[2])*model.site[1]+mod1(ix+rx,model.site[1]) )-1
-                        tmp+=sqrt(real(G0[idx1,idx1])*real(G0[idx2,idx2])-real(G0[idx1,idx2])*real(G0[idx2,idx1]))
-                        tmp+=sqrt(real(G0[idx1+1,idx1+1])*real(G0[idx2+1,idx2+1])-real(G0[idx1+1,idx2+1])*real(G[idx2+1,idx1+1]))
-                        tmp-=sqrt(real(G0[idx1+1,idx1+1])*real(G0[idx2,idx2])-real(G0[idx1+1,idx2])*real(G0[idx2,idx1+1]))
-                        tmp-=sqrt(real(G0[idx1,idx1])*real(G0[idx2+1,idx2+1])-real(G0[idx1,idx2+1])*real(G0[idx2+1,idx1]))
+                        tmp+=(1-G0[idx1,idx1])*(1-G0[idx2,idx2])-G0[idx1,idx2]*G0[idx2,idx1]
+                        tmp+=(1-G0[idx1+1,idx1+1])*(1-G0[idx2+1,idx2+1])-G0[idx1+1,idx2+1]*G[idx2+1,idx1+1]
+                        tmp-=(1-G0[idx1+1,idx1+1])*(1-G0[idx2,idx2])-G0[idx1+1,idx2]*G0[idx2,idx1+1]
+                        tmp-=(1-G0[idx1,idx1])*(1-G0[idx2+1,idx2+1])-G0[idx1,idx2+1]*G0[idx2+1,idx1]
                     end
                 end
-                tmp=tmp/prod(model.site)/4
+                tmp/=prod(model.site)
                 R0+=tmp
                 R1+=cos(2*π/model.site[1]*rx+2*π/model.site[2]*ry)*tmp
             end
@@ -237,10 +272,10 @@ function phy_measure(model,G,lt,s)
                     for iy in 1:model.site[2]
                         idx1=ix+(iy-1)*model.site[1]
                         idx2=mod1(rx+ix,model.site[1])+mod((ry+iy-1),model.site[2])*model.site[1]
-                        tmp+=sqrt(real(G0[idx1,idx1])*real(G0[idx2,idx2])-real(G0[idx1,idx2])*real(G0[idx2,idx1]))
+                        tmp+=(1-G0[idx1,idx1])*(1-G0[idx2,idx2])-G0[idx1,idx2]*G0[idx2,idx1]
                     end
                 end
-                tmp=tmp/prod(model.site)/4
+                tmp/=prod(model.site)
                 R0+=tmp*cos(π*(rx+ry))
                 R1+=cos(π*(rx+ry)+2*π/model.site[1]*rx+2*π/model.site[2]*ry )*tmp
             end

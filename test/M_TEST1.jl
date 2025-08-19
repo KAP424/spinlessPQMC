@@ -7,32 +7,40 @@ using Random
 rng=MersenneTwister(time_ns())
 
 t=1;   Lattice="HoneyComb"    
-U=8;     Δt=0.05;     Θ=0.1;
+U=0;     Δt=0.05;     Θ=0.1;
 BatchSize=10;
   
 
 L=3
 site=[L,L]
 
-model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
+model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"H0")
 s=Initial_s(model,rng)
 
 path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
-s=phy_update(path,model,s,1,true)
-for k in 1:length(model.nnidx)
-    x,y=model.nnidx[k]
-    println(x," ",y)
-end
+# s=phy_update(path,model,s,1,true)
 
-G=Gτ(model,s,div(model.Nt,2))
-
-diag(G)
-
--model.U*sum(G.*conj.(G).*model.K)
+G0=Gτ(model,s,div(model.Nt,2))
 
 H0=model.t*1im*UpperTriangular(model.K)
-H0=(H0+H0')/2
-Ek=2*real(sum(H0.*G))
+H0=(H0+H0')/4
+
+Ek=(real(sum(H0.*G0)))
+
+println(Ek)
+
+
+println((sum(real.(model.K.*(G0))))/2)
+
+
+println((sum(imag.(model.K.*(G0))))/2)
+
+# -model.U*sum(G.*conj.(G).*model.K)
+
+# norm(G+transpose(G))
+
+# G[1,3]+G[3,1]
+
 # ------------------------------------------------------------------------
 # TEST for Green function
 # println(size(s))

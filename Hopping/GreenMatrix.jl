@@ -18,22 +18,25 @@ function Initial_s(model::_Hubbard_Para,rng::MersenneTwister)::Array{Int8,3}
     return s
 end
 
-
 "equal time Green function"
-# ::Array{ComplexF64,2}
-function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)
-    BL::Array{ComplexF64,2}=model.Pt'[:,:]
-    BR::Array{ComplexF64,2}=model.Pt[:,:]
+function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
+    BL::Array{Float64,2}=model.Pt'[:,:]
+    BR::Array{Float64,2}=model.Pt[:,:]
 
     counter=0
     for lt in model.Nt:-1:τ+1
         for j in 1:size(s)[3]
-            V=zeros(ComplexF64,model.Ns,model.Ns)
+            V=zeros(Float64,model.Ns,model.Ns)
             for i in 1:size(s)[2]
                 x,y=model.nnidx[i,j]
-                V[x,y]=s[lt,i,j]*1im/4
-                V[y,x]=-s[lt,i,j]*1im/4
+                V[x,y]=V[y,x]=s[lt,i,j]
             end
+            #####################################################################
+            tmp=model.UV[j,:,:]*V*model.UV[j,:,:]'
+            if norm(tmp-diagm(diag(tmp)))>1e-6
+                println("diagnose error")
+            end
+            #####################################################################
             E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
             BL=BL*model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
         end
@@ -48,12 +51,17 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)
     for lt in 1:1:τ
         BR=model.eK*BR
         for j in size(s)[3]:-1:1
-            V=zeros(ComplexF64,model.Ns,model.Ns)
+            V=zeros(Float64,model.Ns,model.Ns)
             for i in 1:size(s)[2]
                 x,y=model.nnidx[i,j]
-                V[x,y]=s[lt,i,j]*1im/4
-                V[y,x]=-s[lt,i,j]*1im/4
+                V[x,y]=V[y,x]=s[lt,i,j]
             end
+            #####################################################################
+            tmp=model.UV[j,:,:]*V*model.UV[j,:,:]'
+            if norm(tmp-diagm(diag(tmp)))>1e-6
+                println("diagnose error")
+            end
+            #####################################################################
             E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
             BR=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]*BR
         end

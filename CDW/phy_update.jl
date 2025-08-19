@@ -4,7 +4,7 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,2},Sweeps::I
     elseif model.Lattice=="HoneyComb"
         name="HC"
     end
-    file="$(path)$(name)CDW_PHY$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)BS$(model.BatchSize).csv"
+    file="$(path)CDW_phy$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)BS$(model.BatchSize).csv"
     
     
     rng=MersenneTwister(Threads.threadid())
