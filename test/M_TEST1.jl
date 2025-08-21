@@ -25,7 +25,7 @@ G0=Gτ(model,s,div(model.Nt,2))
 H0=model.t*1im*UpperTriangular(model.K)
 H0=(H0+H0')/4
 
-Ek=(real(sum(H0.*G0)))
+Ek=2*(real(sum(H0.*G0)))
 
 println(Ek)
 

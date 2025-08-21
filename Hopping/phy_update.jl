@@ -1,5 +1,13 @@
 # Trotter e^V1 e^V2 e^V3 e^K
 
+uv=[-2^0.5/2 -2^0.5/2;-2^0.5/2 2^0.5/2]
+
+a=[0 -2;-2 0]
+
+uv*a*uv'
+
+
+
 function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::Int64,record::Bool)
     uv=[-2^0.5/2 -2^0.5/2;-2^0.5/2 2^0.5/2]
     if model.Lattice=="SQUARE"
@@ -48,9 +56,8 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
                     subidx=[x,y]
-                    Δ=[0 -2*s[lt+1,i,j]; -2*s[lt+1,i,j] 0]
-                    E=diag(uv*Δ*uv')
-                    Δ=uv'*diagm(exp.(model.α*E))*uv-I(2)
+                    E=[-2*s[lt+1,i,j] , 2*s[lt+1,i,j]]
+                    Δ=uv'*diagm(exp.(model.α.*E))*uv-I(2)
                     r=I(2)+Δ*(I(2)-G[subidx,subidx])
                     detR=det(r)
                     if detR<0
@@ -60,7 +67,6 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                     ss=copy(s)
                     ss[lt+1,i,j]=-ss[lt+1,i,j]
                     dassda=abs(detR-Poss(model,ss)/Poss(model,s))
-                    println("Poss diff: $(dassda)")
                     if abs(dassda)>1e-5
                         error("Poss error: $(dassda)")
                     end
@@ -114,9 +120,8 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
                     subidx=[x,y]
-                    Δ=[0 -2*s[lt,i,j]; -2*s[lt,i,j] 0]
-                    E=diag(uv*Δ*uv')
-                    Δ=uv'*diagm(exp.(model.α*E))*uv-I(2)
+                    E=[-2*s[lt,i,j] , 2*s[lt,i,j]]
+                    Δ=uv'*diagm(exp.(model.α.*E))*uv-I(2)
                     r=I(2)+Δ*(I(2)-G[subidx,subidx])
                     detR=(det(r))
                     if detR<0
@@ -128,21 +133,21 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                         s[lt,i,j]=-s[lt,i,j]
                     
                         #####################################################################
-                        ss=copy(s)
-                        GG=Gτ(model,ss,lt)
-                        VV=zeros(Float64,model.Ns,model.Ns)
-                        for jj in 1:j-1
-                            for ii in 1:size(s)[2]
-                                x,y=model.nnidx[ii,jj]
-                                VV[x,y]=VV[y,x]=ss[lt,ii,jj]
-                            end
-                            E=diag(model.UV[jj,:,:]*VV*model.UV[jj,:,:]')
-                            GG=model.UV[jj,:,:]'*diagm(exp.(-model.α*E))*model.UV[jj,:,:] *GG* model.UV[jj,:,:]'*diagm(exp.(model.α*E))*model.UV[jj,:,:]
-                        end
+                        # ss=copy(s)
+                        # GG=Gτ(model,ss,lt)
+                        # VV=zeros(Float64,model.Ns,model.Ns)
+                        # for jj in 1:j-1
+                        #     for ii in 1:size(s)[2]
+                        #         x,y=model.nnidx[ii,jj]
+                        #         VV[x,y]=VV[y,x]=ss[lt,ii,jj]
+                        #     end
+                        #     E=diag(model.UV[jj,:,:]*VV*model.UV[jj,:,:]')
+                        #     GG=model.UV[jj,:,:]'*diagm(exp.(-model.α*E))*model.UV[jj,:,:] *GG* model.UV[jj,:,:]'*diagm(exp.(model.α*E))*model.UV[jj,:,:]
+                        # end
             
-                        if(norm(G-GG)>1e-4)
-                            println(j," error: ",norm(G-GG),"  ",i)
-                        end
+                        # if(norm(G-GG)>1e-4)
+                        #     println(j," error: ",norm(G-GG),"  ",i)
+                        # end
                         #####################################################################
                     end
                 end
