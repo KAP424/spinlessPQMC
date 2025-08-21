@@ -1,13 +1,5 @@
 # Trotter e^V1 e^V2 e^V3 e^K
 
-uv=[-2^0.5/2 -2^0.5/2;-2^0.5/2 2^0.5/2]
-
-a=[0 -2;-2 0]
-
-uv*a*uv'
-
-
-
 function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::Int64,record::Bool)
     uv=[-2^0.5/2 -2^0.5/2;-2^0.5/2 2^0.5/2]
     if model.Lattice=="SQUARE"
@@ -59,14 +51,14 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                     E=[-2*s[lt+1,i,j] , 2*s[lt+1,i,j]]
                     Δ=uv'*diagm(exp.(model.α.*E))*uv-I(2)
                     r=I(2)+Δ*(I(2)-G[subidx,subidx])
-                    detR=det(r)
-                    if detR<0
-                        println("negative possibility! $(detR)")
-                    end
+                    detR=det(r)^2
+                    # if detR<0
+                    #     println("negative possibility! $(detR)")
+                    # end
                     #####################################################################
                     ss=copy(s)
                     ss[lt+1,i,j]=-ss[lt+1,i,j]
-                    dassda=abs(detR-Poss(model,ss)/Poss(model,s))
+                    dassda=detR-Poss(model,ss)/Poss(model,s)
                     if abs(dassda)>1e-5
                         error("Poss error: $(dassda)")
                     end
@@ -123,10 +115,10 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                     E=[-2*s[lt,i,j] , 2*s[lt,i,j]]
                     Δ=uv'*diagm(exp.(model.α.*E))*uv-I(2)
                     r=I(2)+Δ*(I(2)-G[subidx,subidx])
-                    detR=(det(r))
-                    if detR<0
-                        println("negative possibility! $(detR)")
-                    end
+                    detR=(det(r))^2
+                    # if detR<0
+                    #     println("negative possibility! $(detR)")
+                    # end
                     # println(detR)
                     if rand(rng)<detR
                         G-=(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:]))
@@ -201,7 +193,7 @@ function Poss(model,s)
     end
 
     BR=model.Pt'*BR
-    return det(BR)
+    return det(BR)^2
 end
 
 

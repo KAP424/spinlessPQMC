@@ -30,6 +30,5 @@ Poss(model,ss)
 Poss(model,s)
 
 path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
-s=phy_update(path,model,s,1,true)
+s=phy_update(path,model,s,1,false)
 
-length(model.nnidx)
