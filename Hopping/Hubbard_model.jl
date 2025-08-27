@@ -86,13 +86,6 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     # K[K .!= 0] .+=( rand(size(K)...) * 0.1)[K.!= 0]
     # K=(K+K')./2
 
-    # H0=zeros(ComplexF64,Ns,Ns)
-    # for i in 1:length(nnidx)
-    #     x,y=nnidx[i]
-    #     H0[x,y]=1im
-    #     H0[y,x]=-1im
-    # end
-
 
     E,V=eigen(-t.*K)
     HalfeK=V*diagm(exp.(-Δt.*E./2))*V'
@@ -113,18 +106,13 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     s=ones(Int8,Nt,a,b)
     UV=zeros(Float64,b,Ns,Ns)
     
-    lt=1
-    for j in 1:size(s)[3]
-        V=zeros(Float64,Ns,Ns)
+    for j in 1:b
         for i in 1:size(s)[2]
             x,y=nnidx[i,j]
-            V[x,y]=V[y,x]=s[lt,i,j]
+            UV[j,x,x]=UV[j,x,y]=UV[j,y,x]=-2^0.5/2
+            UV[j,y,y]=2^0.5/2
         end
-        _,UV[j,:,:]=eigen(V)
-        UV[j,:,:]=UV[j,:,:]'
     end
-
-    
 
     return _Hubbard_Para(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,WrapTime,Δt,α,Pt,HalfeK,eK,HalfeKinv,eKinv,nnidx,UV)
 

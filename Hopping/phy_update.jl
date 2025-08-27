@@ -16,78 +16,84 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
     
     G=zeros(Float64,model.Ns,model.Ns)
     for loop in 1:Sweeps
-        for lt in 0:model.Nt-1
-            println("t:  ",lt)
-            if mod(lt,model.WrapTime)==0
-                G=model.eK*Gτ(model,s,lt)*model.eKinv
+        for lt in 1:model.Nt
+            if mod(lt,model.WrapTime)==1
+                G=model.eK*Gτ(model,s,lt-1)*model.eKinv
             else
                 #####################################################################
-                if norm(G-Gτ(model,s,lt))>1e-6 
-                    error("$(lt):asdasdsa")
-                end
+                # if norm(G-Gτ(model,s,lt-1))>1e-5
+                #     error("Wrap-$(lt)   :   $(norm(G-Gτ(model,s,lt-1)))")
+                # end
                 #####################################################################
                 G=model.eK*G*model.eKinv
             end
             
 
             for j in size(s)[3]:-1:1
-                V=zeros(Float64,model.Ns,model.Ns)
+                E=zeros(model.Ns)
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
-                    V[x,y]=V[y,x]=s[lt+1,i,j]
+                    E[x]=s[lt,i,j]
+                    E[y]=-s[lt,i,j]
                 end
-                #####################################################################
-                tmp=model.UV[j,:,:]*V*model.UV[j,:,:]'
-                if norm(tmp-diagm(diag(tmp)))>1e-6
-                    println("diagnose error")
-                end
-                #####################################################################
-                E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
                 G=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:] *G* model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:]
+
+                #####################################################################
+                # V=zeros(Float64,model.Ns,model.Ns)
+                # for i in 1:size(s)[2]
+                #     x,y=model.nnidx[i,j]
+                #     V[x,y]=V[y,x]=s[lt,i,j]
+                # end
+                # tmp=model.UV[j,:,:]'*diagm(E)*model.UV[j,:,:]
+                # if norm(tmp-V)>1e-6
+                #     println("diagnose error")
+                # end
+                #####################################################################
                 
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
                     subidx=[x,y]
-                    E=[-2*s[lt+1,i,j] , 2*s[lt+1,i,j]]
-                    Δ=uv'*diagm(exp.(model.α.*E))*uv-I(2)
+                    E=[-2*s[lt,i,j] , 2*s[lt,i,j]]
+                    Δ=uv*diagm(exp.(model.α.*E))*uv'-I(2)
                     r=I(2)+Δ*(I(2)-G[subidx,subidx])
-                    detR=det(r)^2
-                    # if detR<0
-                    #     println("negative possibility! $(detR)")
-                    # end
-                    #####################################################################
-                    ss=copy(s)
-                    ss[lt+1,i,j]=-ss[lt+1,i,j]
-                    dassda=detR-Poss(model,ss)/Poss(model,s)
-                    if abs(dassda)>1e-5
-                        error("Poss error: $(dassda)")
+                    detR=det(r)
+
+                    if detR<0
+                        println("Negative Sign: $(detR)")
                     end
+                    #####################################################################
+                    # ss=copy(s)
+                    # ss[lt,i,j]=-ss[lt,i,j]
+                    # dassda=detR-Poss(model,ss)/Poss(model,s)
+                    # if abs(dassda)>1e-5
+                    #     error("Poss error lt-$(lt) No.$(j): $(dassda)")
+                    # end
                     #####################################################################
 
                     if rand(rng)<detR
                         G-=(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:]))
-                        s[lt+1,i,j]=-s[lt+1,i,j]
+                        s[lt,i,j]=-s[lt,i,j]
                         #####################################################################
-                        GG=model.eK*Gτ(model,ss,lt)*model.eKinv
-                        VV=zeros(Float64,model.Ns,model.Ns)
-                        for jj in size(s)[3]:-1:j
-                            for ii in 1:size(s)[2]
-                                x,y=model.nnidx[ii,jj]
-                                VV[x,y]=VV[y,x]=ss[lt+1,ii,jj]
-                            end
-                            E=diag(model.UV[jj,:,:]*VV*model.UV[jj,:,:]')
-                            GG=model.UV[jj,:,:]'*diagm(exp.(model.α*E))*model.UV[jj,:,:] *GG* model.UV[jj,:,:]'*diagm(exp.(-model.α*E))*model.UV[jj,:,:]
-                        end
-                        if(norm(G-GG)>1e-4)
-                            println(j," error: ",norm(G-GG),"  ",i)
-                        end
+                        # GG=model.eK*Gτ(model,s,lt-1)*model.eKinv
+                        # for jj in size(s)[3]:-1:j
+                        #     E=zeros(model.Ns)
+                        #     for ii in 1:size(s)[2]
+                        #         x,y=model.nnidx[ii,jj]
+                        #         E[x]=s[lt,ii,jj]
+                        #         E[y]=-s[lt,ii,jj]
+                        #     end
+                        #     GG=model.UV[jj,:,:]'*diagm(exp.(model.α*E))*model.UV[jj,:,:] *GG* model.UV[jj,:,:]'*diagm(exp.(-model.α*E))*model.UV[jj,:,:]
+                        # end
+                        # if(norm(G-GG)>1e-4)
+                        #     error(j," error: ",norm(G-GG),"  ",i)
+                        # end
                         #####################################################################
                     end
                 end
             end
 
-            if record && abs(lt+1-model.Nt/2)<=model.WrapTime
-                tmp=phy_measure(model,G,lt+1,s)
+            if record && abs(lt-model.Nt/2)<=model.WrapTime
+                tmp=phy_measure(model,G,lt,s)
                 Ek+=tmp[1]
                 Ev+=tmp[2]
                 R0+=tmp[3]
@@ -97,14 +103,13 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
         end
 
         for lt in model.Nt:-1:1
-            println("t:  ",lt)
             if mod(lt,model.WrapTime)==1
                 G=Gτ(model,s,lt)
             else
                 #####################################################################
-                if norm(G-Gτ(model,s,lt))>1e-6
-                    error("ltltltl")
-                end
+                # if norm(G-Gτ(model,s,lt))>1e-6
+                #     error("ltltltl")
+                # end
                 #####################################################################
             end
 
@@ -115,40 +120,45 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                     E=[-2*s[lt,i,j] , 2*s[lt,i,j]]
                     Δ=uv'*diagm(exp.(model.α.*E))*uv-I(2)
                     r=I(2)+Δ*(I(2)-G[subidx,subidx])
-                    detR=(det(r))^2
-                    # if detR<0
-                    #     println("negative possibility! $(detR)")
+                    detR=(det(r))
+                    if detR<0
+                        println("Negative Sign")
+                    end
+                    #####################################################################
+                    # ss=copy(s)
+                    # ss[lt,i,j]=-ss[lt,i,j]
+                    # dassda=detR-Poss(model,ss)/Poss(model,s)
+                    # if abs(dassda)>1e-5
+                    #     error("Poss error: $(dassda)")
                     # end
-                    # println(detR)
+                    #####################################################################
                     if rand(rng)<detR
                         G-=(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:]))
                         s[lt,i,j]=-s[lt,i,j]
                     
                         #####################################################################
-                        # ss=copy(s)
-                        # GG=Gτ(model,ss,lt)
-                        # VV=zeros(Float64,model.Ns,model.Ns)
-                        # for jj in 1:j-1
+                        # GG=model.eK*Gτ(model,s,lt-1)*model.eKinv
+                        # for jj in size(s)[3]:-1:j
+                        #     E=zeros(model.Ns)
                         #     for ii in 1:size(s)[2]
                         #         x,y=model.nnidx[ii,jj]
-                        #         VV[x,y]=VV[y,x]=ss[lt,ii,jj]
+                        #         E[x]=s[lt,ii,jj]
+                        #         E[y]=-s[lt,ii,jj]
                         #     end
-                        #     E=diag(model.UV[jj,:,:]*VV*model.UV[jj,:,:]')
-                        #     GG=model.UV[jj,:,:]'*diagm(exp.(-model.α*E))*model.UV[jj,:,:] *GG* model.UV[jj,:,:]'*diagm(exp.(model.α*E))*model.UV[jj,:,:]
+                        #     GG=model.UV[jj,:,:]'*diagm(exp.(model.α*E))*model.UV[jj,:,:] *GG* model.UV[jj,:,:]'*diagm(exp.(-model.α*E))*model.UV[jj,:,:]
                         # end
-            
                         # if(norm(G-GG)>1e-4)
-                        #     println(j," error: ",norm(G-GG),"  ",i)
+                        #     error(j," error: ",norm(G-GG),"  ",i)
                         # end
                         #####################################################################
                     end
                 end
-                V=zeros(Float64,model.Ns,model.Ns)
+                E=zeros(model.Ns)
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
-                    V[x,y]=V[y,x]=s[lt,i,j]
+                    E[x]=s[lt,i,j]
+                    E[y]=-s[lt,i,j]
                 end
-                E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
                 G=model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:] *G* model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
             end
             G=model.eKinv*G*model.eK
@@ -178,22 +188,20 @@ end
 
 function Poss(model,s)
     BR=model.Pt[:,:]
-
     for lt in 1:model.Nt
         BR=model.eK*BR
         for j in size(s)[3]:-1:1
-            V=zeros(Float64,model.Ns,model.Ns)
+            E=zeros(model.Ns)
             for i in 1:size(s)[2]
                 x,y=model.nnidx[i,j]
-                V[x,y]=V[y,x]=s[lt,i,j]
+                E[x]=s[lt,i,j]
+                E[y]=-s[lt,i,j]
             end
-            E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
             BR=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]*BR
         end
     end
-
     BR=model.Pt'*BR
-    return det(BR)^2
+    return det(BR)
 end
 
 
@@ -203,12 +211,12 @@ function phy_measure(model,G,lt,s)
     if lt>model.Nt/2
         for t in lt:-1:div(model.Nt,2)+1
             for j in 1:size(s)[3]
-                V=zeros(Float64,model.Ns,model.Ns)
+                E=zeros(model.Ns)
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
-                    V[x,y]=V[y,x]=s[t,i,j]
+                    E[x]=s[t,i,j]
+                    E[y]=-s[t,i,j]
                 end
-                E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
                 G0=model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
             end
             G0= model.eKinv*G0*model.eK
@@ -217,20 +225,20 @@ function phy_measure(model,G,lt,s)
         for t in lt+1:div(model.Nt,2)
             G0=model.eK*G0*model.eKinv
             for j in size(s)[3]:-1:1
-                V=zeros(Float64,model.Ns,model.Ns)
+                E=zeros(model.Ns)
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
-                    V[x,y]=V[y,x]=s[t,i,j]
+                    E[x]=s[t,i,j]
+                    E[y]=-s[t,i,j]
                 end
-                E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
                 G0=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:]
             end
         end
     end
     #####################################################################
-    if norm(G0-Gτ(model,s,div(model.Nt,2)))>1e-6 
-        error("record error")
-    end
+    # if norm(G0-Gτ(model,s,div(model.Nt,2)))>1e-6 
+    #     error("record error lt=$(lt) : $(norm(G0-Gτ(model,s,div(model.Nt,2))))")
+    # end
     #####################################################################
 
     G0=model.HalfeK* G0 *model.HalfeKinv

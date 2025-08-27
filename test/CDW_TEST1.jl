@@ -7,14 +7,24 @@ using Random
 rng=MersenneTwister(time_ns())
 
 t=1;   Lattice="HoneyComb"    
-U=8;     Δt=0.05;     Θ=0.1;
+U=5;     Δt=0.05;     Θ=2.0;
 BatchSize=10;
   
 
 L=3
 site=[L,L]
 
-model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"H0")
+model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
+
+s=Initial_s(model,rng)
+
+path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
+
+
+s=phy_update(path,model,s,3,false)
+s=phy_update(path,model,s,100,true)
+
+
 # for x in 1:size(s)[2]
 #     xidx=2*x-1
 #     println(findall(model.K[xidx,:].!=0))
@@ -36,7 +46,6 @@ model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"H0")
 
 # ------------------------------------------------------------------------
 # TEST for Green function
-s=Initial_s(model,rng)
 
 # τ=model.Nt
 # # τ=1
@@ -52,13 +61,10 @@ s=Initial_s(model,rng)
 
 # ------------------------------------------------------------------------
 # TEST for phy_update
-path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
-s=phy_update(path,model,s,20,true)
+# s=phy_update(path,model,s,20,true)
 
-G0=Gτ(model,s,div(model.Nt,2))
-Ek=model.t*sum(model.K.*G0)
 
-println(Ek)
+# println(Ek)
 
 
 # lt=1
