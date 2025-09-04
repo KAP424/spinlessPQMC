@@ -21,8 +21,8 @@ module KAPDQMC_spinless_M
     # include("EE_update.jl")
     # export ctrl_EEicr,EE_dir,EEICR
 
-    # include("SCEE.jl")
-    # export ctrl_SCEEicr
+    include("SCEE.jl")
+    export ctrl_SCEEicr
 
     # include("disorder_operate.jl")
     # export DO_icr

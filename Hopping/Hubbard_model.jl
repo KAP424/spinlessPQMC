@@ -74,15 +74,15 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
         end
     end
     # 交错化学势，打开gap，去兼并
-    # μ=0.0
-    # if Lattice=="HoneyComb"
-    #     K+=μ*diagm(repeat([-1, 1], div(Ns, 2)))
-    # elseif Lattice=="SQUARE"
-    #     for i in 1:Ns
-    #         x,y=i_xy(Lattice,site,i)
-    #         K[i,i]+=μ*(-1)^(x+y)
-    #     end
-    # end
+    μ=0.0
+    if Lattice=="HoneyComb"
+        K+=μ*diagm(repeat([-1, 1], div(Ns, 2)))
+    elseif Lattice=="SQUARE"
+        for i in 1:Ns
+            x,y=i_xy(Lattice,site,i)
+            K[i,i]+=μ*(-1)^(x+y)
+        end
+    end
     # K[K .!= 0] .+=( rand(size(K)...) * 0.1)[K.!= 0]
     # K=(K+K')./2
 

@@ -22,7 +22,7 @@ path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
 
 
 s=phy_update(path,model,s,3,false)
-s=phy_update(path,model,s,100,true)
+s=phy_update(path,model,s,500,true)
 
 
 # for x in 1:size(s)[2]

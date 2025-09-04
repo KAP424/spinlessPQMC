@@ -7,8 +7,8 @@ using Random
 rng=MersenneTwister(1)
 
 t=1;   Lattice="HoneyComb"    
-U=5;     Δt=0.05;     Θ=2.0;
-BatchSize=10;
+U=8;     Δt=0.05;     Θ=0.05;
+BatchSize=2;
   
 
 L=3
@@ -16,11 +16,32 @@ site=[L,L]
 
 model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
 
-
 s=Initial_s(model,rng)
-# G0=Gτ(model,s,div(model.Nt,2))
-# Gt,G0,Gt0,G0t=G4(model,s,div(model.Nt,2),2)
+G0=Gτ(model,s,div(model.Nt,2))
+Gt,G0,Gt0,G0t=G4(model,s,div(model.Nt,2),2)
 
+
+path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
+# s=phy_update(path,model,s,3,false)
+# s=phy_update(path,model,s,500,true)
+
+
+# # Half
+indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
+println(indexA)
+
+# # HalfHalf
+indexB=area_index(Lattice,site,([1,1],[div(L,3),div(2*L,3)]))
+println(indexB)
+
+ss=[s[:,:,:],s[:,:,:]]
+λ=0.5
+Nλ=2
+Sweeps=1
+
+ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,false)
+
+# ----------------------------------------------------------------------------------------
 # print(norm(Gt-G0))
 # for _ in 1:1000
 #     i=rand(1:size(s)[1])
@@ -35,10 +56,7 @@ s=Initial_s(model,rng)
 #         print("-")
 #     end
 # end                 
-
-path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
-s=phy_update(path,model,s,3,false)
-s=phy_update(path,model,s,100,true)
+# ----------------------------------------------------------------------------------------
 
 # uv=[-2^0.5/2 -2^0.5/2;-2^0.5/2 2^0.5/2]
 
@@ -71,4 +89,13 @@ s=phy_update(path,model,s,100,true)
 # E=diag(UV*V*UV')
 
 # norm(E+VV)
+# ----------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
