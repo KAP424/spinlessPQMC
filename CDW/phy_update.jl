@@ -4,7 +4,7 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,2},Sweeps::I
     elseif model.Lattice=="HoneyComb"
         name="HC"
     end
-    file="$(path)$(name)CDW_PHY$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)BS$(model.BatchSize).csv"
+    file="$(path)CDW_phy$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)BS$(model.BatchSize).csv"
     
     
     rng=MersenneTwister(Threads.threadid())
@@ -38,19 +38,22 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,2},Sweeps::I
                 subidx=[x,y]
                 r=I(2)+Δ*(I(2)-G[subidx,subidx])
                 detR=det(r)
-                if detR<0
-                    println("Warning for negative possibility!")
-                end
+                # if detR<0
+                #     print("*")
+                # else
+                #     print("-")
+                # end
                 ####################################################################
-                ss=s[:,:]
-                ss[lt,k]=-ss[lt,k]
-                if abs(Poss(model,ss)/Poss(model,s)-detR)>1e-3
-                    println("possibility error:",abs(Poss(model,ss)/Poss(model,s)-detR))
-                end
+                # ss=s[:,:]
+                # ss[lt,k]=-ss[lt,k]
+                # if abs(Poss(model,ss)/Poss(model,s)-detR)>1e-3
+                #     println("possibility error:",abs(Poss(model,ss)/Poss(model,s)-detR))
+                # end
                 ####################################################################
                 if rand(rng)<abs(detR)
                     G=G-(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:]))
                     s[lt,k]=-s[lt,k]
+                    # print(detR > 0 ? "+" : "-")
 
                     ####################################################################
                     if norm(G-Gτ(model,s,lt))>1e-4
@@ -84,9 +87,9 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,2},Sweeps::I
                 G=model.eKinv* diagm(exp.(-model.α.*D)) *G* diagm(exp.(model.α.*D))*model.eK
                 
                 #####################################################################
-                if norm(G-Gτ(model,s,lt))>1e-4
-                    println("reversal wrap error: ",norm(G-Gτ(model,s,lt)))
-                end
+                # if norm(G-Gτ(model,s,lt))>1e-4
+                #     println("reversal wrap error: ",norm(G-Gτ(model,s,lt)))
+                # end
                 #####################################################################
             end
 
@@ -96,24 +99,27 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,2},Sweeps::I
                 subidx=[x,y]
                 r=I(2)+Δ*(I(2)-G[subidx,subidx])
                 detR=det(r)
-                if detR<0
-                    println("Warning for negative possibility!")
-                end
+                # if detR<0
+                #     print("*")
+                # else
+                #     print("-")
+                # end
                 ####################################################################
-                ss=s[:,:]
-                ss[lt,k]=-ss[lt,k]
-                if abs(Poss(model,ss)/Poss(model,s)-detR)>1e-3
-                    println("possibility error:",abs(Poss(model,ss)/Poss(model,s)-detR))
-                end
+                # ss=s[:,:]
+                # ss[lt,k]=-ss[lt,k]
+                # if abs(Poss(model,ss)/Poss(model,s)-detR)>1e-3
+                #     println("possibility error:",abs(Poss(model,ss)/Poss(model,s)-detR))
+                # end
                 ####################################################################
                 if rand(rng)<abs(detR)
                     G=G-(G[:,subidx]/r*Δ*((I(model.Ns)-G)[subidx,:]))
                     s[lt,k]=-s[lt,k]
+                    # print(detR > 0 ? "+" : "-")
 
                     ####################################################################
-                    if norm(G-Gτ(model,s,lt))>1e-4
-                        println("G update error:",norm(G-Gτ(model,s,lt)))
-                    end
+                    # if norm(G-Gτ(model,s,lt))>1e-4
+                    #     println("G update error:",norm(G-Gτ(model,s,lt)))
+                    # end
                     #####################################################################
 
                     if record && abs(lt-model.Nt/2)<=model.WrapTime
@@ -124,6 +130,9 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,2},Sweeps::I
                         R1+=tmp[4]
                         counter+=1
                         sg+=sign(detR)
+                        # if detR<0
+                        #     println("\n")
+                        # end
                     end
                 end
             end
@@ -182,9 +191,9 @@ function phy_measure(model,G,lt,s)
         end
     end
     #####################################################################
-    if norm(G0-Gτ(model,s,div(model.Nt,2)))>1e-4 
-        println("record error:",norm(G0-Gτ(model,s,div(model.Nt,2))))
-    end
+    # if norm(G0-Gτ(model,s,div(model.Nt,2)))>1e-4 
+    #     println("record error:",norm(G0-Gτ(model,s,div(model.Nt,2))))
+    # end
     #####################################################################
 
     G0=model.HalfeK* G0 *model.HalfeKinv

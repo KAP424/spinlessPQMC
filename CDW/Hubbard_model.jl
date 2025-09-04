@@ -46,7 +46,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     # K[K .!= 0] .+=( rand(size(K)...) * 0.1)[K.!= 0]
     # K=(K+K')./2
 
-    E,V=eigen(t*K)
+    E,V=eigen(-t*K)
     
     HalfeK=V*diagm(exp.(-Δt.*E./2))*V'
     eK=V*diagm(exp.(-Δt.*E))*V'

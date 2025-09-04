@@ -1,13 +1,17 @@
 # 2d Trotter Decomposition
-# using density channel ±1 HS transformation
-function Initial_s(model::_Hubbard_Para,rng::MersenneTwister)::Array{Int8,2}
-    sp=Random.Sampler(rng,[1,-1])
+# using Majorana channel ±1 HS transformation
+# Trotter e^V1 e^V2 e^V3 e^K
 
-    s=zeros(Int8,model.Nt,length(model.nnidx))
+function Initial_s(model::_Hubbard_Para,rng::MersenneTwister)::Array{Int8,3}
+    sp=Random.Sampler(rng,[1,-1])
+    a,b=size(model.nnidx)
+    s=zeros(Int8,model.Nt,a,b)
 
     for i = 1:size(s)[1]
         for j = 1:size(s)[2]
-            s[i,j] =rand(rng,sp)
+            for k = 1:size(s)[3]
+                s[i,j,k] =rand(rng,sp)
+            end
         end  
     end  
 
@@ -17,20 +21,23 @@ end
 
 "equal time Green function"
 # ::Array{ComplexF64,2}
-function Gτ(model::_Hubbard_Para,s::Array{Int8,2},τ::Int64)
+function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)
     BL::Array{ComplexF64,2}=model.Pt'[:,:]
     BR::Array{ComplexF64,2}=model.Pt[:,:]
 
     counter=0
-    for i in model.Nt:-1:τ+1
-        D=zeros(ComplexF64,model.Ns,model.Ns)
-        for k in 1:size(s)[2]
-            x,y=model.nnidx[k].I
-            D[x,y]=s[i,k]*1im/2
-            D[y,x]=-s[i,k]*1im/2
+    for lt in model.Nt:-1:τ+1
+        for j in 1:size(s)[3]
+            V=zeros(ComplexF64,model.Ns,model.Ns)
+            for i in 1:size(s)[2]
+                x,y=model.nnidx[i,j]
+                V[x,y]=s[lt,i,j]*1im/4
+                V[y,x]=-s[lt,i,j]*1im/4
+            end
+            E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
+            BL=BL*model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
         end
-        E,V=eigen(D)
-        BL=BL*V*diagm(exp.(model.α.*E))*V'*model.eK
+        BL=BL*model.eK
         counter+=1
         if counter==model.BatchSize
             counter=0
@@ -38,15 +45,18 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,2},τ::Int64)
         end
     end
     counter=0
-    for i in 1:1:τ
-        D=zeros(ComplexF64,model.Ns,model.Ns)
-        for k in 1:size(s)[2]
-            x,y=model.nnidx[k].I
-            D[x,y]=s[i,k]*1im/2
-            D[y,x]=-s[i,k]*1im/2
+    for lt in 1:1:τ
+        BR=model.eK*BR
+        for j in size(s)[3]:-1:1
+            V=zeros(ComplexF64,model.Ns,model.Ns)
+            for i in 1:size(s)[2]
+                x,y=model.nnidx[i,j]
+                V[x,y]=s[lt,i,j]*1im/4
+                V[y,x]=-s[lt,i,j]*1im/4
+            end
+            E=diag(model.UV[j,:,:]*V*model.UV[j,:,:]')
+            BR=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]*BR
         end
-        E,V=eigen(D)
-        BR=V*diagm(exp.(model.α.*E))*V'*model.eK*BR
         counter+=1
         if counter==model.BatchSize
             counter=0
@@ -80,8 +90,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,2},τ1::Int64,τ2::Int64)
             D=zeros(ComplexF64,model.Ns,model.Ns)
             for k in 1:size(s)[2]
                 x,y=model.nnidx[k].I
-                D[x,y]=s[i,k]*1im/2
-                D[y,x]=-s[i,k]*1im/2
+                D[x,y]=s[i,k]*1im/4
+                D[y,x]=-s[i,k]*1im/4
             end
             E,V=eigen(D)
             UR[1,:,:]=V*diagm(exp.(model.α.*E))*V'*model.eK*UR[1,:,:]
@@ -98,8 +108,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,2},τ1::Int64,τ2::Int64)
             D=zeros(ComplexF64,model.Ns,model.Ns)
             for k in 1:size(s)[2]
                 x,y=model.nnidx[k].I
-                D[x,y]=s[i,k]*1im/2
-                D[y,x]=-s[i,k]*1im/2
+                D[x,y]=s[i,k]*1im/4
+                D[y,x]=-s[i,k]*1im/4
             end
             E,V=eigen(D)
             UL[end,:,:]=UL[end,:,:]*V*diagm(exp.(model.α.*E))*V'*model.eK
@@ -118,8 +128,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,2},τ1::Int64,τ2::Int64)
                 D=zeros(ComplexF64,model.Ns,model.Ns)
                 for k in 1:size(s)[2]
                     x,y=model.nnidx[k].I
-                    D[x,y]=s[τ2+(i-1)*model.BatchSize+j,k]*1im/2
-                    D[y,x]=-s[τ2+(i-1)*model.BatchSize+j,k]*1im/2
+                    D[x,y]=s[τ2+(i-1)*model.BatchSize+j,k]*1im/4
+                    D[y,x]=-s[τ2+(i-1)*model.BatchSize+j,k]*1im/4
                 end
                 E,V=eigen(D)
                 BBs[i,:,:]=V*diagm(exp.(model.α.*E))*V'*model.eK*BBs[i,:,:]
@@ -133,8 +143,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,2},τ1::Int64,τ2::Int64)
             D=zeros(ComplexF64,model.Ns,model.Ns)
             for k in 1:size(s)[2]
                 x,y=model.nnidx[k].I
-                D[x,y]=s[j,k]*1im/2
-                D[y,x]=-s[j,k]*1im/2
+                D[x,y]=s[j,k]*1im/4
+                D[y,x]=-s[j,k]*1im/4
             end
             E,V=eigen(D)
             BBs[end,:,:]=V*diagm(exp.(model.α.*E))*V'*model.eK*BBs[end,:,:]
@@ -201,8 +211,8 @@ function G12FF(model,s,τ1,τ2)
             D=zeros(ComplexF64,model.Ns,model.Ns)
             for k in 1:size(s)[2]
                 x,y=model.nnidx[k].I
-                D[x,y]=s[i,k]*1im/2
-                D[y,x]=-s[i,k]*1im/2
+                D[x,y]=s[i,k]*1im/4
+                D[y,x]=-s[i,k]*1im/4
             end
             E,V=eigen(D)
             BBs=V*diagm(exp.(model.α.*E))*V'*model.eK*BBs

@@ -10,18 +10,27 @@ using DelimitedFiles
 using KAPDQMC_spinless_CDW
 using LinearAlgebra
 using Random
-rng=MersenneTwister(1)
+rng=MersenneTwister(time_ns())
 
 t=1;   Lattice="HoneyComb"    
-U=8;     Δt=0.1;     Θ=0.3;
+U=5;     Δt=0.05;     Θ=2.0;
 BatchSize=10;
   
 
-L=6
+L=3
 site=[L,L]
 
 model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
-nn2idx(Lattice,site,1)
+
+s=Initial_s(model,rng)
+
+path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
+
+
+s=phy_update(path,model,s,3,false)
+s=phy_update(path,model,s,500,true)
+
+
 # for x in 1:size(s)[2]
 #     xidx=2*x-1
 #     println(findall(model.K[xidx,:].!=0))
@@ -43,7 +52,6 @@ nn2idx(Lattice,site,1)
 
 # ------------------------------------------------------------------------
 # TEST for Green function
-s=Initial_s(model,rng)
 
 # τ=model.Nt
 # # τ=1
@@ -59,8 +67,10 @@ s=Initial_s(model,rng)
 
 # ------------------------------------------------------------------------
 # TEST for phy_update
-path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
-s=phy_update(path,model,s,1,true)
+# s=phy_update(path,model,s,20,true)
+
+
+# println(Ek)
 
 
 # lt=1
