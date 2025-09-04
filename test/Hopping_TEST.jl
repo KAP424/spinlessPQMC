@@ -7,8 +7,8 @@ using Random
 rng=MersenneTwister(1)
 
 t=1;   Lattice="HoneyComb"    
-U=8;     Δt=0.05;     Θ=0.05;
-BatchSize=2;
+U=8;     Δt=0.05;     Θ=0.2;
+BatchSize=10;
   
 
 L=3

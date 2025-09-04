@@ -17,7 +17,7 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
     G=zeros(Float64,model.Ns,model.Ns)
     for loop in 1:Sweeps
         for lt in 1:model.Nt
-            if mod(lt,model.WrapTime)==1 || lt==div(model.Nt,2)+1
+            if mod(lt,model.WrapTime)==1
                 G=model.eK*Gτ(model,s,lt-1)*model.eKinv
             else
                 #####################################################################
