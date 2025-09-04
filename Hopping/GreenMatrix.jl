@@ -14,7 +14,6 @@ function Initial_s(model::_Hubbard_Para,rng::MersenneTwister)::Array{Int8,3}
             end
         end  
     end  
-
     return s
 end
 
@@ -228,39 +227,6 @@ end
 function GroverMatrix(G1::Array{Float64,2},G2::Array{Float64,2})::Array{Float64,2}
     II=I(size(G1)[1])
     return G1*G2+(II-G1)*(II-G2)
-end
-
-
-function G12FF(model,s,τ1,τ2)
-    
-    if τ1>τ2
-        G=Gτ(model,s,τ2)
-        BBs=I(model.Ns)
-        BBsInv=I(model.Ns)
-
-        for i in τ2+1:τ1
-            # D=[model.η[x] for x in s[:,i]]
-            D=zeros(Float64,model.Ns,model.Ns)
-            for k in 1:size(s)[2]
-                x,y=model.nnidx[k].I
-                D[x,y]=s[i,k]*1im/4
-                D[y,x]=-s[i,k]*1im/4
-            end
-            E,V=eigen(D)
-            BBs=V*diagm(exp.(model.α.*E))*V'*model.eK*BBs
-            BBsInv=BBsInv*model.eKinv*V*diagm(exp.(-model.α.*E))*V'
-        end
-
-
-        G12=BBs*G
-        G21=-( I(model.Ns)-G ) * BBsInv
-
-        return G12,G21
-    elseif τ1<τ2
-        G21,G12=G12FF(model,s,τ2,τ1)
-        return G12,G21
-    end
-    
 end
 
 

@@ -39,7 +39,7 @@ ss=[s[:,:,:],s[:,:,:]]
 Nλ=2
 Sweeps=1
 
-ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,false)
+ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
 
 # ----------------------------------------------------------------------------------------
 # print(norm(Gt-G0))
