@@ -1,0 +1,30 @@
+push!(LOAD_PATH,"C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/Hopping/")
+using DelimitedFiles
+using KAPDQMC_spinless_H
+using LinearAlgebra
+using Random
+
+
+t=1;   Lattice="HoneyComb60"    
+U=5;     Δt=0.05;     Θ=2.0;
+BatchSize=5;
+  
+
+L=3
+site=[L,L]
+
+path="C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/test/"
+
+println("Threads: ",Threads.nthreads())
+
+model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
+
+print(model.nodes)
+
+Threads.@threads for i in 1:Threads.nthreads()  
+    rng=MersenneTwister(1)
+    # time_ns()+Threads.threadid()
+    s=Initial_s(model,rng)
+    s=phy_update(path,model,s,10,false)
+    s=phy_update(path,model,s,100,true)
+end

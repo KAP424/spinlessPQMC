@@ -21,8 +21,8 @@ struct _Hubbard_Para
     eKinv::Array{Float64,2}
     nnidx::Matrix{Tuple{Int64, Int64}}
     UV::Array{Float64, 3}
+    nodes::Vector{Int64}
 end
-
 
 
 function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
@@ -61,7 +61,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
                 end
             end
         end
-    elseif  Lattice=="HoneyComb"
+    elseif  occursin("HoneyComb", Lattice)
         Ns=prod(site)*2
         nnidx=fill((0, 0), div(Ns,2), 3)
         count=1
@@ -73,19 +73,6 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
             count+=1
         end
     end
-    # 交错化学势，打开gap，去兼并
-    μ=0.0
-    if Lattice=="HoneyComb"
-        K+=μ*diagm(repeat([-1, 1], div(Ns, 2)))
-    elseif Lattice=="SQUARE"
-        for i in 1:Ns
-            x,y=i_xy(Lattice,site,i)
-            K[i,i]+=μ*(-1)^(x+y)
-        end
-    end
-    # K[K .!= 0] .+=( rand(size(K)...) * 0.1)[K.!= 0]
-    # K=(K+K')./2
-
 
     E,V=eigen(-t.*K)
     HalfeK=V*diagm(exp.(-Δt.*E./2))*V'
@@ -93,41 +80,122 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     HalfeKinv=V*diagm(exp.(Δt.*E./2))*V'
     eKinv=V*diagm(exp.(Δt.*E))*V'
 
+
+    Pt=zeros(Float64,Ns,Int(Ns/2))
     if Initial=="H0"
-        Pt=V[:,1:div(Ns,2)]
+        # 交错化学势，打开gap，去兼并
+        KK=K[:,:]
+        μ=0
+        if occursin("HoneyComb", Lattice)
+            KK+=μ*diagm(repeat([-1, 1], div(Ns, 2)))
+        elseif Lattice=="SQUARE"
+            for i in 1:Ns
+                x,y=i_xy(Lattice,site,i)
+                KK[i,i]+=μ*(-1)^(x+y)
+            end
+        end
+
+        # hopping 扰动，避免能级简并
+        KK[KK .!= 0] .+=( rand(size(KK)...) * 1e-5)[KK.!= 0]
+        KK=(KK+KK')./2
+        
+        E,V=eigen(KK)
+        Pt.=V[:,div(Ns,2)+1:end]
     elseif Initial=="V" 
-        Pt=zeros(Float64,Ns,Int(Ns/2))
-        for i in 1:Int(Ns/2)
-            Pt[i*2,i]=1
+        if occursin("HoneyComb", Lattice)
+            for i in 1:div(Ns,2)
+                Pt[i*2,i]=1
+            end
+        else
+            count=1
+            for i in 1:Ns
+                x,y=i_xy(Lattice,site,i)
+                if (x+y)%2==1
+                    Pt[i,count]=1
+                    count+=1
+                end
+            end
         end
     end
 
+    Pt=HalfeKinv*Pt
+
     a,b=size(nnidx)
     s=ones(Int8,Nt,a,b)
-    UV=zeros(Float64,b,Ns,Ns)
+    UV=zeros(Float64,Ns,Ns,b)
     
     for j in 1:b
         for i in 1:size(s)[2]
             x,y=nnidx[i,j]
-            UV[j,x,x]=UV[j,x,y]=UV[j,y,x]=-2^0.5/2
-            UV[j,y,y]=2^0.5/2
+            UV[x,x,j]=UV[x,y,j]=UV[y,x,j]=-2^0.5/2
+            UV[y,y,j]=2^0.5/2
         end
     end
 
-    return _Hubbard_Para(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,WrapTime,Δt,α,Pt,HalfeK,eK,HalfeKinv,eKinv,nnidx,UV)
+    if div(Nt, 2) % BatchSize == 0
+        nodes = collect(0:BatchSize:Nt)
+    else
+        nodes = vcat(0, reverse(collect(div(Nt, 2) - BatchSize:-BatchSize:1)), collect(div(Nt, 2):BatchSize:Nt), Nt)
+    end
+
+    return _Hubbard_Para(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,WrapTime,Δt,α,Pt,HalfeK,eK,HalfeKinv,eKinv,nnidx,UV,nodes)
 
 end
 
 
 
-# function setμ(model::_Hubbard_Para,μ)
-#     # fig1:1d
-#     # km=abs(acos(μ/2))
-#     # N_particle=Int(round(km/π*model.Ns))
+if abspath(PROGRAM_FILE) == @__FILE__
+    push!(LOAD_PATH,"C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/Hopping/")
+    using KAPDQMC_spinless_H
+    using LinearAlgebra,Random
+
+    model=KAPDQMC_spinless_H.Hubbard_Para(1.0,4.0,"HoneyComb120",[3,3],0.1,2.0,10,"H0")
+    println("Hubbard model initialized.")
+    s=Initial_s(model,MersenneTwister(1234))
     
-#     # fig2:2d-circle Fermi surface
-#     N_particle=Int(round( μ^2/4/π *model.Ns ))
-    
-#     E,V=eigen(model.K)
-#     model.Pt=V[:,1:N_particle]
-# end
+    # TEST For diag transformation of nn interaction UV*Diagonal(s)*UV' = V
+    lt=1
+    tmpVV=zeros(Float64,3,model.Ns,model.Ns)
+    for j in 3:-1:1
+        tmpN=zeros(Float64,model.Ns)
+        tmpV=zeros(Float64,model.Ns,model.Ns)
+        println("---------------")
+        for i in 1:div(model.Ns,2)
+            # println(i," ",j,": ",model.nnidx[i,j])
+            x,y=model.nnidx[i,j]
+            tmpN[x]=s[lt,i,j]
+            tmpN[y]=-s[lt,i,j]
+
+            tmpV[x,y]=s[lt,i,j]
+            tmpV[y,x]=s[lt,i,j]
+        end
+        tmpVV[j,:,:]=tmpV[:,:]
+        @assert norm(model.UV[:,:,j]*Diagonal(tmpN)*model.UV[:,:,j]'-tmpV)<1e-5
+        @assert norm(model.UV[:,:,j]'*model.UV[:,:,j]-I(model.Ns))<1e-5
+    end
+
+    # TEST for not comute for V1,V2,V3
+    @assert norm(tmpVV[1,:,:]*tmpVV[2,:,:]-tmpVV[2,:,:]*tmpVV[1,:,:])>1e-5
+    @assert norm(tmpVV[1,:,:]*tmpVV[3,:,:]-tmpVV[3,:,:]*tmpVV[1,:,:])>1e-5
+    @assert norm(tmpVV[2,:,:]*tmpVV[3,:,:]-tmpVV[3,:,:]*tmpVV[2,:,:])>1e-5
+
+    # TEST for comute for V_i,V_i^′
+    for j in 3:-1:1
+        tmp=tmpVV[j,:,:]
+        for i in 1:div(model.Ns,2)
+            x,y=model.nnidx[i,j]
+            tmp[x,y]=-tmp[x,y]
+            tmp[y,x]=-tmp[y,x]
+            @assert norm(tmp * tmpVV[j,:,:] - tmpVV[j,:,:]*tmp) <1e-5
+        end
+    end
+
+    # TEST for diag transformation of update UV*Diagonal(s)*UV' = V
+    uv=[-2^0.5/2 -2^0.5/2;-2^0.5/2 2^0.5/2]
+    tmp22= [0 -2 ; -2.0  0]
+    tmp2=[-2,2]
+    println(norm(uv*Diagonal(tmp2)*uv' .- tmp22))
+end
+
+
+

@@ -1,45 +1,85 @@
-push!(LOAD_PATH,"E:/桌面/JuliaDQMC/code/spinlessPQMC/Hopping/")
+push!(LOAD_PATH,"C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/Hopping/")
 using DelimitedFiles
 
-using KAPDQMC_spinless_M
+using KAPDQMC_spinless_H
 using LinearAlgebra
 using Random
-rng=MersenneTwister(1)
 
-t=1;   Lattice="HoneyComb"    
-U=8;     Δt=0.05;     Θ=0.2;
-BatchSize=10;
-  
 
-L=3
+function main()
+    rng=MersenneTwister(time_ns())
+
+    t=1;   Lattice="HoneyComb60"    
+    U=5;     Δt=0.05;     Θ=3.0;
+    BatchSize=5;
+
+    L=3
+    site=[L,L]
+
+    model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
+    println(model.nodes)
+
+    s=Initial_s(model,rng)
+
+    path="C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/test/"
+    s=phy_update(path,model,s,1,true)
+
+end
+
+
+# main()
+
+# -----------------------------------------------
+t=1;   Lattice="HoneyComb60"    
+U=0;     Δt=0.02;     Θ=2.0;
+BatchSize=5;
+L=9
 site=[L,L]
 
-model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
-
+rng=MersenneTwister(2)
+model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"H0")
 s=Initial_s(model,rng)
-G0=Gτ(model,s,div(model.Nt,2))
-Gt,G0,Gt0,G0t=G4(model,s,div(model.Nt,2),2)
+
+println(model.α)
+
+G=Gτ(model,s,div(model.Nt,2))
 
 
-path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
-# s=phy_update(path,model,s,3,false)
-# s=phy_update(path,model,s,500,true)
+E,V,R0,R1=phy_measure(model,G,div(model.Nt,2),s)  
+println("E: ",E,"  V: ",V)
+println("R0: ",R0,"\nR1: ",R1)
+# -----------------------------------------------
 
 
-# # Half
-indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
-println(indexA)
+# -----------------------------------------------
+BR=model.HalfeK*model.Pt
 
-# # HalfHalf
-indexB=area_index(Lattice,site,([1,1],[div(L,3),div(2*L,3)]))
-println(indexB)
+BL=model.Pt'*model.HalfeKinv
 
-ss=[s[:,:,:],s[:,:,:]]
-λ=0.5
-Nλ=2
-Sweeps=1
 
-ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
+println(norm(BL*BR-I(div(model.Ns,2))))
+
+# -----------------------------------------------
+
+
+# s=phy_update(path,model,s,30,true)
+
+
+# # # Half
+# indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
+# println(indexA)
+
+# # # HalfHalf
+# indexB=area_index(Lattice,site,([1,1],[div(L,3),div(2*L,3)]))
+# println(indexB)
+
+# ss=[s[:,:,:],s[:,:,:]]
+# λ=0.5
+# Nλ=2
+# Sweeps=10
+
+# ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
+# ss=ctrl_EEicr(path,model,indexA,Sweeps,λ,Nλ,ss,true)
 
 # ----------------------------------------------------------------------------------------
 # print(norm(Gt-G0))

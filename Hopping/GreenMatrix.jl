@@ -2,6 +2,76 @@
 # using Hopping channel ±1 HS transformation
 # Trotter e^V1 e^V2 e^V3 e^K
 
+function BM_F!(BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
+    """
+    不包头包尾
+    """
+    Ns=model.Ns
+    nodes=model.nodes
+    α=model.α
+    @assert 0< idx <=length(model.nodes)
+
+    tmpN = Vector{ComplexF64}(undef, Ns)
+    tmpNN = Matrix{ComplexF64}(undef, Ns, Ns)
+
+    fill!(tmpNN,0)
+    @inbounds for i in diagind(tmpNN)
+        tmpNN[i] = 1
+    end
+
+    for lt in nodes[idx] + 1:nodes[idx + 1]
+        mul!(BM,model.eK,tmpNN)
+        for j in 3:-1:1
+            for i in 1:div(Ns,2)
+                x,y=model.nnidx[i,j]
+                tmpN[x]=s[lt,i,j]
+                tmpN[y]=-s[lt,i,j]
+            end
+            tmpN.= exp.(α*tmpN)
+
+            mul!(tmpNN,view(model.UV,:,:,j),BM)
+            mul!(BM,Diagonal(tmpN),tmpNN)
+            mul!(tmpNN,view(model.UV,:,:,j)',BM)
+            copyto!(BM,tmpNN)
+        end
+    end
+end
+
+function BMinv_F!(BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
+    """
+    不包头包尾
+    """
+    Ns=model.Ns
+    nodes=model.nodes
+    α=model.α
+    @assert 0< idx <=length(model.nodes)
+
+    tmpN = Vector{ComplexF64}(undef, Ns)
+    tmpNN = Matrix{ComplexF64}(undef, Ns, Ns)
+
+    fill!(tmpNN,0)
+    @inbounds for i in diagind(tmpNN)
+        tmpNN[i] = 1
+    end
+
+    for lt in nodes[idx] + 1:nodes[idx + 1]
+        mul!(BM,tmpNN,model.eKinv)
+        for j in 3:-1:1
+            for i in 1:div(Ns,2)
+                x,y=model.nnidx[i,j]
+                tmpN[x]=s[lt,i,j]
+                tmpN[y]=-s[lt,i,j]
+            end
+            tmpN.= exp.(-α*tmpN)
+
+            mul!(tmpNN,BM,view(model.UV,:,:,j))
+            mul!(BM,tmpNN,Diagonal(tmpN))
+            mul!(tmpNN,BM,view(model.UV,:,:,j)')
+            copyto!(BM,tmpNN)
+        end
+    end
+end
+
 function Initial_s(model::_Hubbard_Para,rng::MersenneTwister)::Array{Int8,3}
     sp=Random.Sampler(rng,[1,-1])
     a,b=size(model.nnidx)
@@ -22,16 +92,17 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
     BL::Array{Float64,2}=model.Pt'[:,:]
     BR::Array{Float64,2}=model.Pt[:,:]
 
+    E=zeros(model.Ns)
     counter=0
     for lt in model.Nt:-1:τ+1
         for j in 1:size(s)[3]
-            E=zeros(model.Ns)
+            fill!(E,0.0)
             for i in 1:size(s)[2]
                 x,y=model.nnidx[i,j]
                 E[x]=s[lt,i,j]
                 E[y]=-s[lt,i,j]
             end
-            BL=BL*model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
+            BL=BL*model.UV[:,:,j]*Diagonal(exp.(model.α*E))*model.UV[:,:,j]'
 
             #####################################################################
             # V=zeros(Float64,model.Ns,model.Ns)
@@ -56,13 +127,13 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
     for lt in 1:1:τ
         BR=model.eK*BR
         for j in size(s)[3]:-1:1
-            E=zeros(model.Ns)
+            fill!(E,0.0)
             for i in 1:size(s)[2]
                 x,y=model.nnidx[i,j]
                 E[x]=s[lt,i,j]
                 E[y]=-s[lt,i,j]
             end
-            BR=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:] *BR
+            BR=model.UV[:,:,j]*Diagonal(exp.(model.α*E))*model.UV[:,:,j]' *BR
             #####################################################################
             # V=zeros(Float64,model.Ns,model.Ns)
             # for i in 1:size(s)[2]
