@@ -2,6 +2,89 @@
 # using Hopping channel ±1 HS transformation
 # Trotter e^V1 e^V2 e^V3 e^K
 
+function G4!(Gt::Array{Float64, 2},G0::Array{Float64, 2},Gt0::Array{Float64, 2},G0t::Array{Float64, 2},nodes::Vector{Int64},idx::Int64,BLMs::Array{Float64,3},BRMs::Array{Float64,3},BMs::Array{Float64,3},BMinvs::Array{Float64,3})
+    Ns=size(BLMs,2)
+    ns=size(BLMs,1)
+    tmpNN = Matrix{Float64}(undef, Ns, Ns)
+    tmpnn = Matrix{Float64}(undef, ns, ns)
+    tmpNn = Matrix{Float64}(undef, Ns, ns)
+    II=Diagonal(ones(Float64,Ns))
+    tmpNN2 = Matrix{Float64}(undef, Ns, Ns)
+    ipiv = Vector{LAPACK.BlasInt}(undef, ns)
+
+    Θidx=div(length(nodes),2)+1
+
+    mul!(tmpnn,view(BLMs,:,:,idx), view(BRMs,:,:,idx))
+    LAPACK.getrf!(tmpnn,ipiv)
+    LAPACK.getri!(tmpnn, ipiv)
+    mul!(tmpNn,view(BRMs,:,:,idx), tmpnn)
+    mul!(tmpNN, tmpNn, view(BLMs,:,:,idx))
+    Gt .= II .- tmpNN
+    
+    mul!(tmpnn,view(BLMs,:,:,Θidx), view(BRMs,:,:,Θidx))
+    LAPACK.getrf!(tmpnn,ipiv)
+    LAPACK.getri!(tmpnn, ipiv)
+    mul!(tmpNn,view(BRMs,:,:,Θidx), tmpnn)
+
+    mul!(tmpNN, tmpNn, view(BLMs,:,:,Θidx))
+    G0 .= II .- tmpNN
+    
+    Gt0 .= II
+    G0t .= II
+    if idx<Θidx
+        for j in idx:Θidx-1
+            if j==idx
+                tmpNN .= II .- Gt
+            else
+                mul!(tmpnn,view(BLMs,:,:,j), view(BRMs,:,:,j))
+                LAPACK.getrf!(tmpnn,ipiv)
+                LAPACK.getri!(tmpnn, ipiv)
+                mul!(tmpNn,view(BRMs,:,:,j), tmpnn)
+                mul!(tmpNN, tmpNn, view(BLMs,:,:,j))
+            end
+            mul!(tmpNN2,Gt0, tmpNN)
+            mul!(Gt0, tmpNN2, view(BMinvs,:,:,j))
+            tmpNN2 .= II .- tmpNN
+            mul!(tmpNN,tmpNN2, G0t)
+            mul!(G0t, view(BMs,:,:,j), tmpNN)
+        end
+        lmul!(-1.0, Gt0)
+    elseif idx>Θidx
+        for j in Θidx:idx-1
+            if j==Θidx
+                tmpNN .=II .- G0
+            else
+                mul!(tmpnn,view(BLMs,:,:,j), view(BRMs,:,:,j))
+                LAPACK.getrf!(tmpnn,ipiv)
+                LAPACK.getri!(tmpnn, ipiv)
+                mul!(tmpNn,view(BRMs,:,:,j), tmpnn)
+                mul!(tmpNN, tmpNn, view(BLMs,:,:,j))
+            end
+            mul!(tmpNN2, G0t, tmpNN)
+            mul!(G0t, tmpNN2,view(BMinvs,:,:,j))
+            tmpNN2 .= II .- tmpNN
+            mul!(tmpNN, tmpNN2, Gt0)
+            mul!(Gt0, view(BMs,:,:,j), tmpNN)
+        end
+        lmul!(-1.0, G0t)
+    else
+        G0.=Gt
+        Gt0.=Gt.-II
+        G0t.=Gt
+    end
+end
+
+function GroverMatrix!(GM::Matrix{Float64},G1::SubArray{Float64, 2, Matrix{Float64}, Tuple{Vector{Int64}, Vector{Int64}}, false},G2::SubArray{Float64, 2, Matrix{Float64}, Tuple{Vector{Int64}, Vector{Int64}}, false})
+    mul!(GM,G1,G2)
+    lmul!(2.0, GM)
+    axpy!(-1.0, G1, GM)
+    axpy!(-1.0, G2, GM)
+    for i in diagind(GM)
+        GM[i] += 1.0
+    end
+end
+
+
 function BM_F!(BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
     """
     不包头包尾
@@ -11,8 +94,8 @@ function BM_F!(BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
     α=model.α
     @assert 0< idx <=length(model.nodes)
 
-    tmpN = Vector{ComplexF64}(undef, Ns)
-    tmpNN = Matrix{ComplexF64}(undef, Ns, Ns)
+    tmpN = Vector{Float64}(undef, Ns)
+    tmpNN = Matrix{Float64}(undef, Ns, Ns)
 
     fill!(tmpNN,0)
     @inbounds for i in diagind(tmpNN)
@@ -27,7 +110,7 @@ function BM_F!(BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
                 tmpN[x]=s[lt,i,j]
                 tmpN[y]=-s[lt,i,j]
             end
-            tmpN.= exp.(α*tmpN)
+            tmpN.= exp.(α.*tmpN)
 
             mul!(tmpNN,view(model.UV,:,:,j),BM)
             mul!(BM,Diagonal(tmpN),tmpNN)
@@ -46,8 +129,8 @@ function BMinv_F!(BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
     α=model.α
     @assert 0< idx <=length(model.nodes)
 
-    tmpN = Vector{ComplexF64}(undef, Ns)
-    tmpNN = Matrix{ComplexF64}(undef, Ns, Ns)
+    tmpN = Vector{Float64}(undef, Ns)
+    tmpNN = Matrix{Float64}(undef, Ns, Ns)
 
     fill!(tmpNN,0)
     @inbounds for i in diagind(tmpNN)
@@ -62,7 +145,7 @@ function BMinv_F!(BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
                 tmpN[x]=s[lt,i,j]
                 tmpN[y]=-s[lt,i,j]
             end
-            tmpN.= exp.(-α*tmpN)
+            tmpN.= exp.(-α.*tmpN)
 
             mul!(tmpNN,BM,view(model.UV,:,:,j))
             mul!(BM,tmpNN,Diagonal(tmpN))
@@ -110,7 +193,7 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
             #     x,y=model.nnidx[i,j]
             #     V[x,y]=V[y,x]=s[lt,i,j]
             # end
-            # tmp=model.UV[j,:,:]'*diagm(E)*model.UV[j,:,:]
+            # tmp=model.UV[:,:,j]'*diagm(E)*model.UV[:,:,j]
             # if norm(tmp-V)>1e-6
             #     println("diagnose error")
             # end
@@ -140,7 +223,7 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
             #     x,y=model.nnidx[i,j]
             #     V[x,y]=V[y,x]=s[lt,i,j]
             # end
-            # tmp=model.UV[j,:,:]'*diagm(E)*model.UV[j,:,:]
+            # tmp=model.UV[:,:,j]'*diagm(E)*model.UV[:,:,j]
             # if norm(tmp-V)>1e-6
             #     println("diagnose error")
             # end
@@ -184,7 +267,7 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
                     E[x]=s[lt,i,j]
                     E[y]=-s[lt,i,j]
                 end
-                UR[1,:,:]=model.UV[j,:,:]'*diagm(exp.(model.α.*E))*model.UV[j,:,:]*UR[1,:,:]
+                UR[1,:,:]=model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'*UR[1,:,:]
             end
 
             counter+=1
@@ -204,7 +287,7 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
                     E[x]=s[lt,i,j]
                     E[y]=-s[lt,i,j]
                 end
-                UL[end,:,:]=UL[end,:,:]*model.UV[j,:,:]'*diagm(exp.(model.α.*E))*model.UV[j,:,:]
+                UL[end,:,:]=UL[end,:,:]*model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'
             end
             UL[end,:,:]=UL[end,:,:]*model.eK
 
@@ -229,8 +312,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
                         E[x]=s[τ2+(lt-1)*model.BatchSize+lt2,i,j]
                         E[y]=-s[τ2+(lt-1)*model.BatchSize+lt2,i,j]
                     end
-                    BBs[lt,:,:]=model.UV[j,:,:]'*diagm(exp.(model.α.*E))*model.UV[j,:,:]*BBs[lt,:,:]
-                    BBsInv[lt,:,:]=BBsInv[lt,:,:]*model.UV[j,:,:]'*diagm(exp.(-model.α.*E))*model.UV[j,:,:]
+                    BBs[lt,:,:]=model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'*BBs[lt,:,:]
+                    BBsInv[lt,:,:]=BBsInv[lt,:,:]*model.UV[:,:,j]*Diagonal(exp.(-model.α.*E))*model.UV[:,:,j]'
 
                 end
             end
@@ -248,8 +331,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
                     E[x]=s[lt,i,j]
                     E[y]=-s[lt,i,j]
                 end
-                BBs[end,:,:]=model.UV[j,:,:]'*diagm(exp.(model.α.*E))*model.UV[j,:,:]*BBs[end,:,:]
-                BBsInv[end,:,:]=BBsInv[end,:,:]*model.UV[j,:,:]'*diagm(exp.(-model.α.*E))*model.UV[j,:,:]
+                BBs[end,:,:]=model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'*BBs[end,:,:]
+                BBsInv[end,:,:]=BBsInv[end,:,:]*model.UV[:,:,j]*Diagonal(exp.(-model.α.*E))*model.UV[:,:,j]' 
             end
         end
     

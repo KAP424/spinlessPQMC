@@ -1,6 +1,6 @@
 push!(LOAD_PATH,"C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/Hopping/")
 using DelimitedFiles
-
+using BenchmarkTools
 using KAPDQMC_spinless_H
 using LinearAlgebra
 using Random
@@ -10,54 +10,71 @@ function main()
     rng=MersenneTwister(time_ns())
 
     t=1;   Lattice="HoneyComb60"    
-    U=5;     Δt=0.05;     Θ=3.0;
+    U=5;     Δt=0.05;     Θ=1.0;
     BatchSize=5;
 
-    L=3
+    L=6
     site=[L,L]
 
     model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
     println(model.nodes)
 
     s=Initial_s(model,rng)
-
     path="C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/test/"
-    s=phy_update(path,model,s,1,true)
+
+    # s=phy_update(path,model,s,1,true)
+
+
+    # Half
+    indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
+    # println(indexA)
+
+    # HalfHalf
+    indexB=area_index(Lattice,site,([1,1],[div(L,3),div(2*L,3)]))
+    # println(indexB)
+
+    ss=[s[:,:,:],s[:,:,:]]
+    λ=0.5
+    Nλ=2
+    Sweeps=1
+
+    ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
 
 end
 
 
-# main()
-
-# -----------------------------------------------
-t=1;   Lattice="HoneyComb60"    
-U=0;     Δt=0.02;     Θ=2.0;
-BatchSize=5;
-L=9
-site=[L,L]
-
-rng=MersenneTwister(2)
-model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"H0")
-s=Initial_s(model,rng)
-
-println(model.α)
-
-G=Gτ(model,s,div(model.Nt,2))
-
-
-E,V,R0,R1=phy_measure(model,G,div(model.Nt,2),s)  
-println("E: ",E,"  V: ",V)
-println("R0: ",R0,"\nR1: ",R1)
-# -----------------------------------------------
+ main()
 
 
 # -----------------------------------------------
-BR=model.HalfeK*model.Pt
+# t=1;   Lattice="HoneyComb60"    
+# U=0;     Δt=0.02;     Θ=2.0;
+# BatchSize=5;
+# L=9
+# site=[L,L]
 
-BL=model.Pt'*model.HalfeKinv
+# rng=MersenneTwister(2)
+# model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"H0")
+# s=Initial_s(model,rng)
+
+# println(model.α)
+
+# G=Gτ(model,s,div(model.Nt,2))
 
 
-println(norm(BL*BR-I(div(model.Ns,2))))
+# E,V,R0,R1=phy_measure(model,G,div(model.Nt,2),s)  
+# println("E: ",E,"  V: ",V)
+# println("R0: ",R0,"\nR1: ",R1)
+# -----------------------------------------------
+
+
+# -----------------------------------------------
+# BR=model.HalfeK*model.Pt
+
+# BL=model.Pt'*model.HalfeKinv
+
+
+# println(norm(BL*BR-I(div(model.Ns,2))))
 
 # -----------------------------------------------
 
@@ -65,20 +82,7 @@ println(norm(BL*BR-I(div(model.Ns,2))))
 # s=phy_update(path,model,s,30,true)
 
 
-# # # Half
-# indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
-# println(indexA)
 
-# # # HalfHalf
-# indexB=area_index(Lattice,site,([1,1],[div(L,3),div(2*L,3)]))
-# println(indexB)
-
-# ss=[s[:,:,:],s[:,:,:]]
-# λ=0.5
-# Nλ=2
-# Sweeps=10
-
-# ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
 # ss=ctrl_EEicr(path,model,indexA,Sweeps,λ,Nλ,ss,true)
 
 # ----------------------------------------------------------------------------------------
@@ -133,9 +137,26 @@ println(norm(BL*BR-I(div(model.Ns,2))))
 
 
 
+# using LinearAlgebra
+
+# A=rand(Float64,10,2)
+# B=rand(Float64,2,10)
+
+# r1=det(I(10)+A*B)
+
+# r2=1+dot(A[:,1],B[1,:])+dot(A[:,2],B[2,:])
+# r2=1+dot(A[:,1]+A[:,2],B[1,:]+B[2,:])
+
+# r2=det(I(2)+B*A)
 
 
+# function dot22(A,B)
+#     return dot(A[:,1],B[1,:])+dot(A[:,2],B[2,:])+dot(A[:,1],B[2,:])*dot(A[:,2],B[1,:])
+# end
 
 
+# rho1=inv(I(10)+A*B)
 
+# rho2=I(10)-A*inv(I(2)+B*A)*B
 
+# norm(rho1-rho2)

@@ -63,9 +63,8 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
 
     for loop in 1:Sweeps
         # println("\n Sweep: $loop ")
-        
         BM_F!(BM,model, s, 1)
-        mul!(tmpnN,view(BLs,:,:,2), BM)
+        mul!(tmpnN,view(BLs,:,:,2),BM)
         LAPACK.gerqf!(tmpnN, tau)
         LAPACK.orgrq!(tmpnN, tau, ns)
         copyto!(view(BLs,:,:,1), tmpnN)
@@ -92,14 +91,16 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                 LAPACK.getri!(tmpnn, ipiv)
                 mul!(tmpNn, view(BRs,:,:,idx), tmpnn)
                 mul!(tmpNN, tmpNn, view(BLs,:,:,idx))
-
                 # println(norm(G-II+tmpNN))
                 @fastmath G .= II .- tmpNN
+
+                #####################################################################
                 axpy!(1.0, G, tmpNN)  
                 axpy!(-1.0, II, tmpNN)  
                 if norm(tmpNN)>1e-8
                     println("Warning for Batchsize Wrap Error : $(norm(tmpNN))")
                 end
+                #####################################################################
 
             end
 
@@ -137,15 +138,17 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
                     subidx=[x,y]
+
                     tmp2[1]=-2*s[lt,i,j];   tmp2[2]=2*s[lt,i,j];
-                    tmp2 .= exp.(model.α.*tmp2)
+                    tmp2 .= exp.(model.α.*tmp2).-1
                     mul!(tmp22,uv,Diagonal(tmp2))
                     mul!(Δ,tmp22,uv')
-                    Δ[1,1]-=1 ; Δ[2,2]-=1;
 
-                    tmp22.= .-view(G,subidx,subidx)
-                    tmp22[1,1]+=1;  tmp22[2,2]+=1;
-                    mul!(r,Δ,tmp22)
+                    # tmp22.= .-view(G,subidx,subidx)
+                    # tmp22[1,1]+=1;  tmp22[2,2]+=1;
+                    # mul!(r,Δ,tmp22)
+                    mul!(r,Δ,view(G,subidx,subidx))
+                    axpby!(1.0,Δ, -1.0, r) 
                     r[1,1]+=1; r[2,2]+=1;
                     # r=I(2)+Δ*(I(2)-G[subidx,subidx])
                     
@@ -327,6 +330,12 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                 counter+=1
             end
         end
+
+        BM_F!(BM,model, s, 1)
+        mul!(tmpnN,view(BLs,:,:,2), BM)
+        LAPACK.gerqf!(tmpnN, tau)
+        LAPACK.orgrq!(tmpnN, tau, ns)
+        copyto!(view(BLs,:,:,1), tmpnN)
 
         if record
             open(file, "a") do io

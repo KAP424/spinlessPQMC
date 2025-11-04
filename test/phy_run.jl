@@ -28,3 +28,4 @@ Threads.@threads for i in 1:Threads.nthreads()
     s=phy_update(path,model,s,10,false)
     s=phy_update(path,model,s,100,true)
 end
+
