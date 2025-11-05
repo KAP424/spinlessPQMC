@@ -6,7 +6,7 @@ module KAPDQMC_spinless_H
     using Random
     using Statistics
 
-    include("../source/Geometry.jl")
+    include("Geometry.jl")
     export K_Matrix,xy_i,i_xy,area_index,nn2idx
 
     include("Hubbard_model.jl")

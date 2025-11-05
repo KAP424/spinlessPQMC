@@ -36,13 +36,18 @@ function main()
     ss=[s[:,:,:],s[:,:,:]]
     λ=0.5
     Nλ=2
-    Sweeps=3
+    Sweeps=1
 
     ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
 end
 
 main()
 # println(@btime main())
+# NO MKL 241.254 ms (204009 allocations: 15.66 MiB)
+# With MKL 782.518 ms (204056 allocations: 15.87 MiB)
+
+
+
 # First 304.746 ms (537237 allocations: 457.84 MiB)
 # Secord 251.443 ms (204507 allocations: 20.56 MiB)
 # 959.025 ms (810702 allocations: 63.29 MiB)

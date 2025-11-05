@@ -15,7 +15,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
 
     uv=[-2^0.5/2 -2^0.5/2;-2^0.5/2 2^0.5/2]
     name = if model.Lattice=="SQUARE" "□" 
-    elseif model.Lattice=="HoneyComb60" "HC" 
+    elseif model.Lattice=="HoneyComb60" "HC60" 
     elseif model.Lattice=="HoneyComb120" "HC120" 
     else error("Lattice: $(model.Lattice) is not allowed !") end  
 
@@ -29,7 +29,6 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                 unlock(io)
             end
         end
-        writedlm("$(path)ss/SS$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)λ$(Int(round(Nλ*λ))).csv", [ss[1] ss[2]],",")
     end
     
     
