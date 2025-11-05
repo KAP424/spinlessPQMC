@@ -10,7 +10,7 @@ function main()
     rng=MersenneTwister(time_ns())
 
     t=1;   Lattice="HoneyComb60"    
-    U=5;     Δt=0.05;     Θ=1.0;
+    U=5;     Δt=0.05;     Θ=0.5;
     BatchSize=5;
 
     L=6
@@ -22,7 +22,7 @@ function main()
     s=Initial_s(model,rng)
     path="C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/test/"
 
-    # s=phy_update(path,model,s,1,true)
+    # s=phy_update(path,model,s,200,true)
 
 
     # Half
@@ -36,14 +36,21 @@ function main()
     ss=[s[:,:,:],s[:,:,:]]
     λ=0.5
     Nλ=2
-    Sweeps=1
+    Sweeps=3
 
     ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
-
 end
 
+main()
+# println(@btime main())
+# First 304.746 ms (537237 allocations: 457.84 MiB)
+# Secord 251.443 ms (204507 allocations: 20.56 MiB)
+# 959.025 ms (810702 allocations: 63.29 MiB)
 
- main()
+# 168.357 s (3793634 allocations: 866.99 MiB)
+
+
+# 加入tmp后明显的速度和内存提升
 
 
 # -----------------------------------------------

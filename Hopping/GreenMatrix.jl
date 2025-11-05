@@ -2,18 +2,8 @@
 # using Hopping channel ±1 HS transformation
 # Trotter e^V1 e^V2 e^V3 e^K
 
-function G4!(Gt::Array{Float64, 2},G0::Array{Float64, 2},Gt0::Array{Float64, 2},G0t::Array{Float64, 2},nodes::Vector{Int64},idx::Int64,BLMs::Array{Float64,3},BRMs::Array{Float64,3},BMs::Array{Float64,3},BMinvs::Array{Float64,3})
-    Ns=size(BLMs,2)
-    ns=size(BLMs,1)
-    tmpNN = Matrix{Float64}(undef, Ns, Ns)
-    tmpnn = Matrix{Float64}(undef, ns, ns)
-    tmpNn = Matrix{Float64}(undef, Ns, ns)
-    II=Diagonal(ones(Float64,Ns))
-    tmpNN2 = Matrix{Float64}(undef, Ns, Ns)
-    ipiv = Vector{LAPACK.BlasInt}(undef, ns)
-
+function G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt::Array{Float64, 2},G0::Array{Float64, 2},Gt0::Array{Float64, 2},G0t::Array{Float64, 2},nodes::Vector{Int64},idx::Int64,BLMs::Array{Float64,3},BRMs::Array{Float64,3},BMs::Array{Float64,3},BMinvs::Array{Float64,3},direction=true::Bool)
     Θidx=div(length(nodes),2)+1
-
     mul!(tmpnn,view(BLMs,:,:,idx), view(BRMs,:,:,idx))
     LAPACK.getrf!(tmpnn,ipiv)
     LAPACK.getri!(tmpnn, ipiv)
@@ -21,56 +11,62 @@ function G4!(Gt::Array{Float64, 2},G0::Array{Float64, 2},Gt0::Array{Float64, 2},
     mul!(tmpNN, tmpNn, view(BLMs,:,:,idx))
     Gt .= II .- tmpNN
     
-    mul!(tmpnn,view(BLMs,:,:,Θidx), view(BRMs,:,:,Θidx))
-    LAPACK.getrf!(tmpnn,ipiv)
-    LAPACK.getri!(tmpnn, ipiv)
-    mul!(tmpNn,view(BRMs,:,:,Θidx), tmpnn)
-
-    mul!(tmpNN, tmpNn, view(BLMs,:,:,Θidx))
-    G0 .= II .- tmpNN
-    
-    Gt0 .= II
-    G0t .= II
-    if idx<Θidx
-        for j in idx:Θidx-1
-            if j==idx
-                tmpNN .= II .- Gt
-            else
-                mul!(tmpnn,view(BLMs,:,:,j), view(BRMs,:,:,j))
-                LAPACK.getrf!(tmpnn,ipiv)
-                LAPACK.getri!(tmpnn, ipiv)
-                mul!(tmpNn,view(BRMs,:,:,j), tmpnn)
-                mul!(tmpNN, tmpNn, view(BLMs,:,:,j))
-            end
-            mul!(tmpNN2,Gt0, tmpNN)
-            mul!(Gt0, tmpNN2, view(BMinvs,:,:,j))
-            tmpNN2 .= II .- tmpNN
-            mul!(tmpNN,tmpNN2, G0t)
-            mul!(G0t, view(BMs,:,:,j), tmpNN)
+    if idx==Θidx
+        G0 .= Gt
+        if direction
+            Gt0.= Gt
+            G0t.= .-tmpNN
+        else
+            Gt0.= .-tmpNN
+            G0t.= Gt
         end
-        lmul!(-1.0, Gt0)
-    elseif idx>Θidx
-        for j in Θidx:idx-1
-            if j==Θidx
-                tmpNN .=II .- G0
-            else
-                mul!(tmpnn,view(BLMs,:,:,j), view(BRMs,:,:,j))
-                LAPACK.getrf!(tmpnn,ipiv)
-                LAPACK.getri!(tmpnn, ipiv)
-                mul!(tmpNn,view(BRMs,:,:,j), tmpnn)
-                mul!(tmpNN, tmpNn, view(BLMs,:,:,j))
-            end
-            mul!(tmpNN2, G0t, tmpNN)
-            mul!(G0t, tmpNN2,view(BMinvs,:,:,j))
-            tmpNN2 .= II .- tmpNN
-            mul!(tmpNN, tmpNN2, Gt0)
-            mul!(Gt0, view(BMs,:,:,j), tmpNN)
-        end
-        lmul!(-1.0, G0t)
     else
-        G0.=Gt
-        Gt0.=Gt.-II
-        G0t.=Gt
+        mul!(tmpnn,view(BLMs,:,:,Θidx), view(BRMs,:,:,Θidx))
+        LAPACK.getrf!(tmpnn,ipiv)
+        LAPACK.getri!(tmpnn, ipiv)
+        mul!(tmpNn,view(BRMs,:,:,Θidx), tmpnn)
+        mul!(tmpNN, tmpNn, view(BLMs,:,:,Θidx))
+        G0 .= II .- tmpNN
+    
+        Gt0 .= II
+        G0t .= II
+        if idx<Θidx
+            for j in idx:Θidx-1
+                if j==idx
+                    tmpNN .= II .- Gt
+                else
+                    mul!(tmpnn,view(BLMs,:,:,j), view(BRMs,:,:,j))
+                    LAPACK.getrf!(tmpnn,ipiv)
+                    LAPACK.getri!(tmpnn, ipiv)
+                    mul!(tmpNn,view(BRMs,:,:,j), tmpnn)
+                    mul!(tmpNN, tmpNn, view(BLMs,:,:,j))
+                end
+                mul!(tmpNN2,Gt0, tmpNN)
+                mul!(Gt0, tmpNN2, view(BMinvs,:,:,j))
+                tmpNN2 .= II .- tmpNN
+                mul!(tmpNN,tmpNN2, G0t)
+                mul!(G0t, view(BMs,:,:,j), tmpNN)
+            end
+            lmul!(-1.0, Gt0)
+        else
+            for j in Θidx:idx-1
+                if j==Θidx
+                    tmpNN .=II .- G0
+                else
+                    mul!(tmpnn,view(BLMs,:,:,j), view(BRMs,:,:,j))
+                    LAPACK.getrf!(tmpnn,ipiv)
+                    LAPACK.getri!(tmpnn, ipiv)
+                    mul!(tmpNn,view(BRMs,:,:,j), tmpnn)
+                    mul!(tmpNN, tmpNn, view(BLMs,:,:,j))
+                end
+                mul!(tmpNN2, G0t, tmpNN)
+                mul!(G0t, tmpNN2,view(BMinvs,:,:,j))
+                tmpNN2 .= II .- tmpNN
+                mul!(tmpNN, tmpNN2, Gt0)
+                mul!(Gt0, view(BMs,:,:,j), tmpNN)
+            end
+            lmul!(-1.0, G0t)
+        end        
     end
 end
 
@@ -169,6 +165,10 @@ function Initial_s(model::_Hubbard_Para,rng::MersenneTwister)::Array{Int8,3}
     end  
     return s
 end
+
+
+
+# Below is just used for debug
 
 "equal time Green function"
 function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
