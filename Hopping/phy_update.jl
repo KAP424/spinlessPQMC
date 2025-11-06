@@ -47,8 +47,8 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
 
     Θidx=div(length(model.nodes),2)+1
 
-    view(BRs,:,:,1) .= model.Pt
-    view(BLs,:,:,NN) .= model.Pt'
+    copyto!(view(BRs,:,:,1) , model.Pt)
+    transpose!(view(BLs,:,:,NN) , model.Pt)
 
     for idx in NN-1:-1:1
         BM_F!(BM,model, s, idx)
@@ -144,7 +144,7 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                 LAPACK.orgqr!(tmpNn, tau, ns)
                 copyto!(view(BRs,:,:,idx), tmpNn)
                 
-                tmpNN .= G
+                copyto!(tmpNN , G)
 
                 get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,idx), view(BRs,:,:,idx),G)
 
@@ -208,7 +208,7 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                 mul!(tmpnN,view(BLs,:,:,idx+1),BM)
                 LAPACK.gerqf!(tmpnN, tau)
                 LAPACK.orgrq!(tmpnN, tau, ns)
-                view(BLs,:,:,idx).=tmpnN
+                copyto!(view(BLs,:,:,idx) , tmpnN)
                 # BL .= Matrix(qr(( BL * BM )').Q)'
 
                 get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,idx), view(BRs,:,:,idx),G)

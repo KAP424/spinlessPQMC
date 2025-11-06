@@ -95,35 +95,36 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
 
     BLMs1=Array{Float64}(undef,ns,model.Ns,NN)
     BRMs1=Array{Float64}(undef,model.Ns,ns,NN)
-    view(BLMs1,:,:,NN) .= model.Pt'
-    view(BRMs1,:,:,1) .= model.Pt
+    transpose!(view(BLMs1,:,:,NN) , model.Pt)
+    copyto!(view(BRMs1,:,:,1) , model.Pt)
     
     BLMs2=Array{Float64}(undef,ns,model.Ns,NN)
     BRMs2=Array{Float64}(undef,model.Ns,ns,NN)
-    view(BLMs2,:,:,NN) .= model.Pt'
-    view(BRMs2,:,:,1) .= model.Pt
+    transpose!(view(BLMs2,:,:,NN) , model.Pt)
+    copyto!(view(BRMs2,:,:,1) , model.Pt)
+
 
     # 没办法优化BL和BR的初始化，只能先全部算出来
     for i in 1:NN-1
         mul!(tmpnN,view(BLMs1,:,:,NN-i+1),view(BMs1,:,:,NN-i))
         LAPACK.gerqf!(tmpnN, tau)
         LAPACK.orgrq!(tmpnN, tau, ns)
-        view(BLMs1,:,:,NN-i) .= tmpnN
+        copyto!(view(BLMs1,:,:,NN-i) , tmpnN)
         
         mul!(tmpNn, view(BMs1,:,:,i), view(BRMs1,:,:,i))
         LAPACK.geqrf!(tmpNn, tau)
         LAPACK.orgqr!(tmpNn, tau, ns)
-        view(BRMs1,:,:,i+1) .= tmpNn
+        copyto!(view(BRMs1,:,:,i+1) , tmpNn)
         # ---------------------------------------------------------------
         mul!(tmpnN,view(BLMs2,:,:,NN-i+1),view(BMs2,:,:,NN-i))
         LAPACK.gerqf!(tmpnN, tau)
         LAPACK.orgrq!(tmpnN, tau, ns)
-        view(BLMs2,:,:,NN-i) .= tmpnN
+        copyto!(view(BLMs2,:,:,NN-i) , tmpnN)
 
         mul!(tmpNn, view(BMs2,:,:,i), view(BRMs2,:,:,i))
         LAPACK.geqrf!(tmpNn, tau)
         LAPACK.orgqr!(tmpNn, tau, ns)
-        view(BRMs2,:,:,i+1) .= tmpNn
+        copyto!(view(BRMs2,:,:,i+1) , tmpNn)
 
     end
 
@@ -315,12 +316,12 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                     mul!(tmpNn, view(BMs1,:,:,i-1), view(BRMs1,:,:,i-1))
                     LAPACK.geqrf!(tmpNn,tau)
                     LAPACK.orgqr!(tmpNn, tau, ns)
-                    view(BRMs1,:,:,i) .= tmpNn
+                    copyto!(view(BRMs1,:,:,i) , tmpNn)
                     # ---------------------------------------------------------------
                     mul!(tmpNn, view(BMs2,:,:,i-1), view(BRMs2,:,:,i-1))
                     LAPACK.geqrf!(tmpNn,tau)
                     LAPACK.orgqr!(tmpNn, tau, ns)
-                    view(BRMs2,:,:,i) .= tmpNn
+                    copyto!(view(BRMs2,:,:,i) , tmpNn)
                 end
 
                 for i in idx-1:-1:min(Θidx,idx)
@@ -328,12 +329,12 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                     mul!(tmpnN,view(BLMs1,:,:,i+1),view(BMs1,:,:,i))
                     LAPACK.gerqf!(tmpnN,tau)
                     LAPACK.orgrq!(tmpnN, tau, ns)
-                    view(BLMs1,:,:,i) .= tmpnN
+                    copyto!(view(BLMs1,:,:,i) , tmpnN)
                     # ---------------------------------------------------------------
                     mul!(tmpnN,view(BLMs2,:,:,i+1),view(BMs2,:,:,i))
                     LAPACK.gerqf!(tmpnN,tau)
                     LAPACK.orgrq!(tmpnN, tau, ns)
-                    view(BLMs2,:,:,i) .= tmpnN
+                    copyto!(view(BLMs2,:,:,i) , tmpnN)
                 end
                 G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,idx,BLMs1,BRMs1,BMs1,BMsinv1,true)
                 G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,idx,BLMs2,BRMs2,BMs2,BMsinv2,true)
@@ -449,28 +450,26 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                 for i in idx:-1:min(Θidx,idx)
                     # println("update BL i=",i)
                     mul!(tmpnN,view(BLMs1,:,:,i+1),view(BMs1,:,:,i))
-                    tmpNn.=tmpnN'
-                    LAPACK.geqrf!(tmpNn,tau)
-                    LAPACK.orgqr!(tmpNn, tau, ns)
-                    view(BLMs1,:,:,i) .= tmpNn'
+                    LAPACK.gerqf!(tmpnN,tau)
+                    LAPACK.orgrq!(tmpnN, tau, ns)
+                    copyto!(view(BLMs1,:,:,i) , tmpnN)
 
                     mul!(tmpnN,view(BLMs2,:,:,i+1),view(BMs2,:,:,i))
-                    tmpNn.=tmpnN'
-                    LAPACK.geqrf!(tmpNn,tau)
-                    LAPACK.orgqr!(tmpNn, tau, ns)
-                    view(BLMs2,:,:,i) .= tmpNn'
+                    LAPACK.gerqf!(tmpnN,tau)
+                    LAPACK.orgrq!(tmpnN, tau, ns)
+                    copyto!(view(BLMs2,:,:,i) , tmpnN)
                 end
                 for i in idx+1:max(Θidx,idx)
                     # println("update BR i=",i)
                     mul!(tmpNn, view(BMs1,:,:,i-1), view(BRMs1,:,:,i-1))
                     LAPACK.geqrf!(tmpNn,tau)
                     LAPACK.orgqr!(tmpNn, tau, ns)
-                    view(BRMs1,:,:,i) .= tmpNn
+                    copyto!(view(BRMs1,:,:,i) , tmpNn)
 
                     mul!(tmpNn, view(BMs2,:,:,i-1), view(BRMs2,:,:,i-1))
                     LAPACK.geqrf!(tmpNn,tau)
                     LAPACK.orgqr!(tmpNn, tau, ns)
-                    view(BRMs2,:,:,i) .= tmpNn
+                    copyto!(view(BRMs2,:,:,i) , tmpNn)
                 end
                 G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,idx,BLMs1,BRMs1,BMs1,BMsinv1,false)
                 G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,idx,BLMs2,BRMs2,BMs2,BMsinv2,false)
@@ -543,7 +542,7 @@ end
     ------------------------------------------------------------------------------
 """
 function get_abTau1!(tmpAA::Matrix{Float64},tmp2A::Matrix{Float64},a::Matrix{Float64},b::Matrix{Float64},Tau::Matrix{Float64},index::Vector{Int64},subidx::Vector{Int64},r::Matrix{Float64},G0::Matrix{Float64},Gt0::Matrix{Float64},G0t::Matrix{Float64},gmInv::Matrix{Float64})
-    tmpAA .= view(G0,index,index)
+    copyto!(tmpAA, view(G0,index,index))
     lmul!(2.0, tmpAA)
     for i in diagind(tmpAA)
         tmpAA[i] -= 1
@@ -566,7 +565,7 @@ end
     ------------------------------------------------------------------------------
 """
 function get_abTau2!(tmpAA::Matrix{Float64},tmp2A::Matrix{Float64},a::Matrix{Float64},b::Matrix{Float64},Tau::Matrix{Float64},index::Vector{Int64},subidx::Vector{Int64},r::Matrix{Float64},G0::Matrix{Float64},Gt0::Matrix{Float64},G0t::Matrix{Float64},gmInv::Matrix{Float64})
-    tmpAA .= view(G0,index,index)
+    copyto!(tmpAA , view(G0,index,index))
     lmul!(2.0, tmpAA)
     for i in diagind(tmpAA)
         tmpAA[i] -= 1

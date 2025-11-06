@@ -6,6 +6,8 @@ using LinearAlgebra
 using Random
 
 
+
+
 function main()
     rng=MersenneTwister(time_ns())
 
@@ -22,7 +24,7 @@ function main()
     s=Initial_s(model,rng)
     path="C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/test/"
 
-    # s=phy_update(path,model,s,200,true)
+    s=phy_update(path,model,s,10,true)
 
 
     # Half
@@ -45,7 +47,6 @@ main()
 # println(@btime main())
 # NO MKL 241.254 ms (204009 allocations: 15.66 MiB)
 # With MKL 782.518 ms (204056 allocations: 15.87 MiB)
-
 
 
 # First 304.746 ms (537237 allocations: 457.84 MiB)

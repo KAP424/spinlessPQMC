@@ -74,7 +74,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
         end
     end
 
-    E,V=eigen(-t.*K)
+    E,V=LAPACK.syevd!('V', 'L',-t.*K[:,:])
     HalfeK=V*diagm(exp.(-Δt.*E./2))*V'
     eK=V*diagm(exp.(-Δt.*E))*V'
     HalfeKinv=V*diagm(exp.(Δt.*E./2))*V'
@@ -99,7 +99,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
         KK[KK .!= 0] .+=( rand(size(KK)...) * 1e-5)[KK.!= 0]
         KK=(KK+KK')./2
         
-        E,V=eigen(KK)
+        E,V=LAPACK.syevd!('V', 'L',KK[:,:])
         Pt.=V[:,div(Ns,2)+1:end]
     elseif Initial=="V" 
         if occursin("HoneyComb", Lattice)
