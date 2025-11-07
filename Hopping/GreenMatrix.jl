@@ -2,68 +2,52 @@
 # using Hopping channel ±1 HS transformation
 # Trotter e^V1 e^V2 e^V3 e^K
 
-function G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt::Array{Float64, 2},G0::Array{Float64, 2},Gt0::Array{Float64, 2},G0t::Array{Float64, 2},nodes::Vector{Int64},idx::Int64,BLMs::Array{Float64,3},BRMs::Array{Float64,3},BMs::Array{Float64,3},BMinvs::Array{Float64,3},direction=true::Bool)
+function G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt::Array{Float64, 2},G0::Array{Float64, 2},Gt0::Array{Float64, 2},G0t::Array{Float64, 2},nodes::Vector{Int64},idx::Int64,BLMs::Array{Float64,3},BRMs::Array{Float64,3},BMs::Array{Float64,3},BMinvs::Array{Float64,3},direction="Forward")
     Θidx=div(length(nodes),2)+1
-    mul!(tmpnn,view(BLMs,:,:,idx), view(BRMs,:,:,idx))
-    LAPACK.getrf!(tmpnn,ipiv)
-    LAPACK.getri!(tmpnn, ipiv)
-    mul!(tmpNn,view(BRMs,:,:,idx), tmpnn)
-    mul!(tmpNN, tmpNn, view(BLMs,:,:,idx))
-    Gt .= II .- tmpNN
+
+    get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,idx),view(BRMs,:,:,idx),Gt)
     
     if idx==Θidx
         G0 .= Gt
-        if direction
+        if direction=="Forward"
             Gt0.= Gt
-            G0t.= .-tmpNN
-        else
-            Gt0.= .-tmpNN
+            G0t.= Gt .- II 
+        elseif direction=="Backward"
+            Gt0.= Gt .- II
             G0t.= Gt
         end
     else
-        mul!(tmpnn,view(BLMs,:,:,Θidx), view(BRMs,:,:,Θidx))
-        LAPACK.getrf!(tmpnn,ipiv)
-        LAPACK.getri!(tmpnn, ipiv)
-        mul!(tmpNn,view(BRMs,:,:,Θidx), tmpnn)
-        mul!(tmpNN, tmpNn, view(BLMs,:,:,Θidx))
-        G0 .= II .- tmpNN
+        get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,Θidx),view(BRMs,:,:,Θidx),G0)
     
         Gt0 .= II
         G0t .= II
         if idx<Θidx
             for j in idx:Θidx-1
                 if j==idx
-                    tmpNN .= II .- Gt
+                    tmpNN2 .= Gt
                 else
-                    mul!(tmpnn,view(BLMs,:,:,j), view(BRMs,:,:,j))
-                    LAPACK.getrf!(tmpnn,ipiv)
-                    LAPACK.getri!(tmpnn, ipiv)
-                    mul!(tmpNn,view(BRMs,:,:,j), tmpnn)
-                    mul!(tmpNN, tmpNn, view(BLMs,:,:,j))
+                    get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,j),view(BRMs,:,:,j),tmpNN2)
                 end
-                mul!(tmpNN2,Gt0, tmpNN)
-                mul!(Gt0, tmpNN2, view(BMinvs,:,:,j))
-                tmpNN2 .= II .- tmpNN
                 mul!(tmpNN,tmpNN2, G0t)
                 mul!(G0t, view(BMs,:,:,j), tmpNN)
+                tmpNN .= II .- tmpNN2
+                mul!(tmpNN2,Gt0, tmpNN)
+                mul!(Gt0, tmpNN2, view(BMinvs,:,:,j))
+                
             end
             lmul!(-1.0, Gt0)
         else
             for j in Θidx:idx-1
                 if j==Θidx
-                    tmpNN .=II .- G0
+                    tmpNN2 .= G0
                 else
-                    mul!(tmpnn,view(BLMs,:,:,j), view(BRMs,:,:,j))
-                    LAPACK.getrf!(tmpnn,ipiv)
-                    LAPACK.getri!(tmpnn, ipiv)
-                    mul!(tmpNn,view(BRMs,:,:,j), tmpnn)
-                    mul!(tmpNN, tmpNn, view(BLMs,:,:,j))
+                    get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,j),view(BRMs,:,:,j),tmpNN2)
                 end
-                mul!(tmpNN2, G0t, tmpNN)
-                mul!(G0t, tmpNN2,view(BMinvs,:,:,j))
-                tmpNN2 .= II .- tmpNN
                 mul!(tmpNN, tmpNN2, Gt0)
                 mul!(Gt0, view(BMs,:,:,j), tmpNN)
+                tmpNN .= II .- tmpNN2
+                mul!(tmpNN2, G0t, tmpNN)
+                mul!(G0t, tmpNN2,view(BMinvs,:,:,j))
             end
             lmul!(-1.0, G0t)
         end        
@@ -80,33 +64,26 @@ function GroverMatrix!(GM::Matrix{Float64},G1::SubArray{Float64, 2, Matrix{Float
     end
 end
 
-
-function BM_F!(BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
+function BM_F!(tmpN,tmpNN,BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
     """
     不包头包尾
     """
-    Ns=model.Ns
-    nodes=model.nodes
-    α=model.α
     @assert 0< idx <=length(model.nodes)
-
-    tmpN = Vector{Float64}(undef, Ns)
-    tmpNN = Matrix{Float64}(undef, Ns, Ns)
 
     fill!(tmpNN,0)
     @inbounds for i in diagind(tmpNN)
         tmpNN[i] = 1
     end
 
-    for lt in nodes[idx] + 1:nodes[idx + 1]
+    for lt in model.nodes[idx] + 1:model.nodes[idx + 1]
         mul!(BM,model.eK,tmpNN)
         for j in 3:-1:1
-            for i in 1:div(Ns,2)
+            for i in axes(s,2)
                 x,y=model.nnidx[i,j]
                 tmpN[x]=s[lt,i,j]
                 tmpN[y]=-s[lt,i,j]
             end
-            tmpN.= exp.(α.*tmpN)
+            tmpN.= exp.(model.α.*tmpN)
 
             mul!(tmpNN,view(model.UV,:,:,j),BM)
             mul!(BM,Diagonal(tmpN),tmpNN)
@@ -116,32 +93,26 @@ function BM_F!(BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
     end
 end
 
-function BMinv_F!(BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
+function BMinv_F!(tmpN,tmpNN,BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
     """
     不包头包尾
     """
-    Ns=model.Ns
-    nodes=model.nodes
-    α=model.α
     @assert 0< idx <=length(model.nodes)
-
-    tmpN = Vector{Float64}(undef, Ns)
-    tmpNN = Matrix{Float64}(undef, Ns, Ns)
 
     fill!(tmpNN,0)
     @inbounds for i in diagind(tmpNN)
         tmpNN[i] = 1
     end
 
-    for lt in nodes[idx] + 1:nodes[idx + 1]
+    for lt in model.nodes[idx] + 1:model.nodes[idx + 1]
         mul!(BM,tmpNN,model.eKinv)
         for j in 3:-1:1
-            for i in 1:div(Ns,2)
+            for i in axes(s,2)
                 x,y=model.nnidx[i,j]
                 tmpN[x]=s[lt,i,j]
                 tmpN[y]=-s[lt,i,j]
             end
-            tmpN.= exp.(-α.*tmpN)
+            tmpN.= exp.(-model.α.*tmpN)
 
             mul!(tmpNN,BM,view(model.UV,:,:,j))
             mul!(BM,tmpNN,Diagonal(tmpN))

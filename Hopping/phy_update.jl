@@ -51,7 +51,7 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
     transpose!(view(BLs,:,:,NN) , model.Pt)
 
     for idx in NN-1:-1:1
-        BM_F!(BM,model, s, idx)
+        BM_F!(tmpN,tmpNN,BM,model, s, idx)
         mul!(tmpnN,view(BLs,:,:,idx+1), BM)
         LAPACK.gerqf!(tmpnN, tau)
         LAPACK.orgrq!(tmpnN, tau, ns)
@@ -59,13 +59,13 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
         # view(BLs,:,:,idx) .= Matrix(qr!(tmpNn).Q)'
     end
 
+    idx=1
+    get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,1), view(BRs,:,:,1),G)
     for loop in 1:Sweeps
         # println("\n Sweep: $loop ")
-        get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,1), view(BRs,:,:,1),G)
-        idx=1
         for lt in 1:model.Nt
             #####################################################################
-            # println(lt)
+            # # println(lt)
             # if norm(G-Gτ(model,s,lt-1))>1e-5
             #     println("\n Sweep: $loop ")
             #     error("Wrap-$(lt)   :   $(norm(G-Gτ(model,s,lt-1)))")
@@ -138,7 +138,7 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
 
             if any(model.nodes.== lt)
                 idx+=1
-                BM_F!(BM,model, s, idx - 1)
+                BM_F!(tmpN,tmpNN,BM,model, s, idx - 1)
                 mul!(tmpNn, BM, view(BRs,:,:,idx-1))
                 LAPACK.geqrf!(tmpNn, tau)
                 LAPACK.orgqr!(tmpNn, tau, ns)
@@ -166,7 +166,7 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
             # if norm(G-Gτ(model,s,lt))>1e-4
             #     error("Wrap-$(lt)   :   $(norm(G-Gτ(model,s,lt+1)))")
             # end
-            #####################################################################
+            ####################################################################
 
             for j in 1:size(s)[3]
                 for i in 1:size(s)[2]
@@ -204,7 +204,7 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
 
             if any(model.nodes.== (lt-1))
                 idx-=1
-                BM_F!(BM,model, s, idx)
+                BM_F!(tmpN,tmpNN,BM,model, s, idx)
                 mul!(tmpnN,view(BLs,:,:,idx+1),BM)
                 LAPACK.gerqf!(tmpnN, tau)
                 LAPACK.orgrq!(tmpnN, tau, ns)

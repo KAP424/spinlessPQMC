@@ -3,7 +3,7 @@
 
 function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},indexB::Vector{Int64},Sweeps::Int64,λ::Float64,Nλ::Int64,ss::Vector{Array{Int8,3}},record)
     Ns=model.Ns
-    ns=div(model.Ns, 2)
+    ns=div(Ns, 2)
     NN=length(model.nodes)
     tau = Vector{Float64}(undef, ns)
     ipiv = Vector{LAPACK.BlasInt}(undef, ns)
@@ -34,14 +34,14 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
     
     rng=MersenneTwister(Threads.threadid()+time_ns())
 
-    Gt1= Matrix{Float64}(undef ,model.Ns, model.Ns)
-    Gt2= Matrix{Float64}(undef ,model.Ns, model.Ns)
-    G01= Matrix{Float64}(undef ,model.Ns, model.Ns)
-    G02= Matrix{Float64}(undef ,model.Ns, model.Ns)
-    Gt01= Matrix{Float64}(undef ,model.Ns, model.Ns)
-    Gt02= Matrix{Float64}(undef ,model.Ns, model.Ns)
-    G0t1= Matrix{Float64}(undef ,model.Ns, model.Ns)
-    G0t2= Matrix{Float64}(undef ,model.Ns, model.Ns)
+    Gt1= Matrix{Float64}(undef ,Ns, Ns)
+    Gt2= Matrix{Float64}(undef ,Ns, Ns)
+    G01= Matrix{Float64}(undef ,Ns, Ns)
+    G02= Matrix{Float64}(undef ,Ns, Ns)
+    Gt01= Matrix{Float64}(undef ,Ns, Ns)
+    Gt02= Matrix{Float64}(undef ,Ns, Ns)
+    G0t1= Matrix{Float64}(undef ,Ns, Ns)
+    G0t2= Matrix{Float64}(undef ,Ns, Ns)
     gmInv_A=Matrix{Float64}(undef ,length(indexA),length(indexA))
     gmInv_B=Matrix{Float64}(undef ,length(indexB),length(indexB))
     detg_A=detg_B=0 
@@ -80,26 +80,26 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
     O=zeros(Float64,Sweeps+1)
     O[1]=λ
 
-    BMs1=Array{Float64}(undef,model.Ns,model.Ns,NN-1)  # Number_of_BM*Ns*Ns
-    BMs2=Array{Float64}(undef,model.Ns,model.Ns,NN-1)  # Number_of_BM*Ns*Ns
-    BMsinv1=Array{Float64}(undef,model.Ns,model.Ns,NN-1)  # Number_of_BM*Ns*Ns
-    BMsinv2=Array{Float64}(undef,model.Ns,model.Ns,NN-1)  # Number_of_BM*Ns*Ns
+    BMs1=Array{Float64}(undef,Ns,Ns,NN-1)  # Number_of_BM*Ns*Ns
+    BMs2=Array{Float64}(undef,Ns,Ns,NN-1)  # Number_of_BM*Ns*Ns
+    BMsinv1=Array{Float64}(undef,Ns,Ns,NN-1)  # Number_of_BM*Ns*Ns
+    BMsinv2=Array{Float64}(undef,Ns,Ns,NN-1)  # Number_of_BM*Ns*Ns
 
     for idx in 1:NN-1
-        BM_F!(view(BMs1,:, : , idx),model,ss[1],idx)
-        BM_F!(view(BMs2,:,:,idx),model,ss[2],idx)
-        BMinv_F!(view(BMsinv1,:,:,idx),model,ss[1],idx)
-        BMinv_F!(view(BMsinv2,:,:,idx),model,ss[2],idx)
-        @assert norm(view(BMs1,:,:,idx)*view(BMsinv1,:,:,idx)-I(model.Ns))<1e-8 "BM1 inv error at idx=$idx"
+        BM_F!(tmpN,tmpNN,view(BMs1,:, : , idx),model,ss[1],idx)
+        BM_F!(tmpN,tmpNN,view(BMs2,:,:,idx),model,ss[2],idx)
+        BMinv_F!(tmpN,tmpNN,view(BMsinv1,:,:,idx),model,ss[1],idx)
+        BMinv_F!(tmpN,tmpNN,view(BMsinv2,:,:,idx),model,ss[2],idx)
+        @assert norm(view(BMs1,:,:,idx)*view(BMsinv1,:,:,idx)-I(Ns))<1e-8 "BM1 inv error at idx=$idx"
     end
 
-    BLMs1=Array{Float64}(undef,ns,model.Ns,NN)
-    BRMs1=Array{Float64}(undef,model.Ns,ns,NN)
+    BLMs1=Array{Float64}(undef,ns,Ns,NN)
+    BRMs1=Array{Float64}(undef,Ns,ns,NN)
     transpose!(view(BLMs1,:,:,NN) , model.Pt)
     copyto!(view(BRMs1,:,:,1) , model.Pt)
     
-    BLMs2=Array{Float64}(undef,ns,model.Ns,NN)
-    BRMs2=Array{Float64}(undef,model.Ns,ns,NN)
+    BLMs2=Array{Float64}(undef,ns,Ns,NN)
+    BRMs2=Array{Float64}(undef,Ns,ns,NN)
     transpose!(view(BLMs2,:,:,NN) , model.Pt)
     copyto!(view(BRMs2,:,:,1) , model.Pt)
 
@@ -128,20 +128,19 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
 
     end
 
+    G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,1,BLMs1,BRMs1,BMs1,BMsinv1)
+    G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,1,BLMs2,BRMs2,BMs2,BMsinv2)
+    GroverMatrix!(gmInv_A,view(G01,indexA,indexA),view(G02,indexA,indexA))
+    detg_A=abs(det(gmInv_A))
+    LAPACK.getrf!(gmInv_A,ipivA)
+    LAPACK.getri!(gmInv_A, ipivA)
+    GroverMatrix!(gmInv_B,view(G01,indexB,indexB),view(G02,indexB,indexB))
+    detg_B=abs(det(gmInv_B))
+    LAPACK.getrf!(gmInv_B,ipivB)
+    LAPACK.getri!(gmInv_B, ipivB)
+    idx=1
     for loop in 1:Sweeps
-        println("\n ====== Sweep $loop / $Sweeps ======")
-        G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,1,BLMs1,BRMs1,BMs1,BMsinv1)
-        G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,1,BLMs2,BRMs2,BMs2,BMsinv2)
-        GroverMatrix!(gmInv_A,view(G01,indexA,indexA),view(G02,indexA,indexA))
-        detg_A=abs(det(gmInv_A))
-        LAPACK.getrf!(gmInv_A,ipivA)
-        LAPACK.getri!(gmInv_A, ipivA)
-        GroverMatrix!(gmInv_B,view(G01,indexB,indexB),view(G02,indexB,indexB))
-        detg_B=abs(det(gmInv_B))
-        LAPACK.getrf!(gmInv_B,ipivB)
-        LAPACK.getri!(gmInv_B, ipivB)
-        idx=1
-
+        # println("\n ====== Sweep $loop / $Sweeps ======")
         for lt in 1:model.Nt
             #####################################################################
             # # println("\n WrapTime check at lt=$lt")
@@ -191,7 +190,6 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                         detTau_A=get_abTau1!(tmpAA,tmp2A,a_A,b_A,Tau_A,indexA,subidx,r,G02,Gt01,G0t1,gmInv_A)
                         detTau_B=get_abTau1!(tmpBB,tmp2B,a_B,b_B,Tau_B,indexB,subidx,r,G02,Gt01,G0t1,gmInv_B)
 
-                        # println("detTau_A: ",detTau_A," detTau_B: ",detTau_B," p:",p)
                         @fastmath p*= (detTau_A)^λ * (detTau_B)^(1-λ)
                         if rand(rng)<p
                             detg_A*=detTau_A
@@ -220,7 +218,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                             # detg_B_=det(GM_B_)
 
                             # for jj in size(ss[1])[3]:-1:j
-                            #     E=zeros(model.Ns)
+                            #     E=zeros(Ns)
                             #     for ii in 1:size(ss[1])[2]
                             #         x,y=model.nnidx[ii,jj]
                             #         E[x]=ss[1][lt,ii,jj]
@@ -248,7 +246,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                         detTau_A=get_abTau2!(tmpAA,tmp2A,a_A,b_A,Tau_A,indexA,subidx,r,G01,Gt02,G0t2,gmInv_A)
                         detTau_B=get_abTau2!(tmpBB,tmp2B,a_B,b_B,Tau_B,indexB,subidx,r,G01,Gt02,G0t2,gmInv_B)
 
-                        @fastmath p*=detTau_A^λ * detTau_B^(1-λ)
+                        @fastmath p*= (detTau_A)^λ * (detTau_B)^(1-λ)
                         if rand(rng)<p
                             detg_A*=detTau_A
                             detg_B*=detTau_B
@@ -276,7 +274,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                             # detg_B_=det(GM_B_)
 
                             # for jj in size(ss[1])[3]:-1:j
-                            #     E=zeros(model.Ns)
+                            #     E=zeros(Ns)
                             #     for ii in 1:size(ss[1])[2]
                             #         x,y=model.nnidx[ii,jj]
                             #         E[x]=ss[2][lt,ii,jj]
@@ -301,16 +299,18 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                 end
 
             end
+
             ##------------------------------------------------------------------------
             tmpO+=(detg_A/detg_B)^(1/Nλ)
             counter+=1
             ##------------------------------------------------------------------------
+            
             if  any(model.nodes .== lt) 
                 idx+=1
-                BM_F!(view(BMs1,:,:,idx-1),model,ss[1],idx-1)
-                BMinv_F!(view(BMsinv1,:,:,idx-1),model,ss[1],idx-1)
-                BM_F!(view(BMs2,:,:,idx-1),model,ss[2],idx-1)
-                BMinv_F!(view(BMsinv2,:,:,idx-1),model,ss[2],idx-1)
+                BM_F!(tmpN,tmpNN,view(BMs1,:,:,idx-1),model,ss[1],idx-1)
+                BMinv_F!(tmpN,tmpNN,view(BMsinv1,:,:,idx-1),model,ss[1],idx-1)
+                BM_F!(tmpN,tmpNN,view(BMs2,:,:,idx-1),model,ss[2],idx-1)
+                BMinv_F!(tmpN,tmpNN,view(BMsinv2,:,:,idx-1),model,ss[2],idx-1)
                 for i in idx:max(Θidx,idx)
                     # println("update BR i=",i)
                     mul!(tmpNn, view(BMs1,:,:,i-1), view(BRMs1,:,:,i-1))
@@ -336,8 +336,8 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                     LAPACK.orgrq!(tmpnN, tau, ns)
                     copyto!(view(BLMs2,:,:,i) , tmpnN)
                 end
-                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,idx,BLMs1,BRMs1,BMs1,BMsinv1,true)
-                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,idx,BLMs2,BRMs2,BMs2,BMsinv2,true)
+                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,idx,BLMs1,BRMs1,BMs1,BMsinv1,"Forward")
+                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,idx,BLMs2,BRMs2,BMs2,BMsinv2,"Forward")
                 GroverMatrix!(gmInv_A,view(G01,indexA,indexA),view(G02,indexA,indexA))
                 detg_A=abs(det(gmInv_A))
                 LAPACK.getrf!(gmInv_A,ipivA)
@@ -434,19 +434,16 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
 
             end
 
-            WrapK!(tmpNN,Gt1,Gt01,G0t1,model.eKinv,model.eK)
-            WrapK!(tmpNN,Gt2,Gt02,G0t2,model.eKinv,model.eK)
-
             ##------------------------------------------------------------------------
             tmpO+=(detg_A/detg_B)^(1/Nλ)
             counter+=1
             ##------------------------------------------------------------------------
             if  any(model.nodes.== (lt-1)) 
                 idx-=1
-                BM_F!(view(BMs1,:,:,idx),model,ss[1],idx)
-                BM_F!(view(BMs2,:,:,idx),model,ss[2],idx)
-                BMinv_F!(view(BMsinv1,:,:,idx),model,ss[1],idx)
-                BMinv_F!(view(BMsinv2,:,:,idx),model,ss[2],idx)
+                BM_F!(tmpN,tmpNN,view(BMs1,:,:,idx),model,ss[1],idx)
+                BM_F!(tmpN,tmpNN,view(BMs2,:,:,idx),model,ss[2],idx)
+                BMinv_F!(tmpN,tmpNN,view(BMsinv1,:,:,idx),model,ss[1],idx)
+                BMinv_F!(tmpN,tmpNN,view(BMsinv2,:,:,idx),model,ss[2],idx)
                 for i in idx:-1:min(Θidx,idx)
                     # println("update BL i=",i)
                     mul!(tmpnN,view(BLMs1,:,:,i+1),view(BMs1,:,:,i))
@@ -471,8 +468,8 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                     LAPACK.orgqr!(tmpNn, tau, ns)
                     copyto!(view(BRMs2,:,:,i) , tmpNn)
                 end
-                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,idx,BLMs1,BRMs1,BMs1,BMsinv1,false)
-                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,idx,BLMs2,BRMs2,BMs2,BMsinv2,false)
+                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,idx,BLMs1,BRMs1,BMs1,BMsinv1,"Backward")
+                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,idx,BLMs2,BRMs2,BMs2,BMsinv2,"Backward")
                 GroverMatrix!(gmInv_A,view(G01,indexA,indexA),view(G02,indexA,indexA))
                 detg_A=abs(det(gmInv_A))
                 LAPACK.getrf!(gmInv_A,ipivA)
@@ -481,6 +478,9 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                 detg_B=abs(det(gmInv_B))
                 LAPACK.getrf!(gmInv_B,ipivB)
                 LAPACK.getri!(gmInv_B, ipivB)
+            else
+                WrapK!(tmpNN,Gt1,Gt01,G0t1,model.eKinv,model.eK)
+                WrapK!(tmpNN,Gt2,Gt02,G0t2,model.eKinv,model.eK)
             end
         end
 

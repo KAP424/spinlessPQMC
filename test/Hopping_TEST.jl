@@ -38,7 +38,7 @@ function main()
     ss=[s[:,:,:],s[:,:,:]]
     λ=0.5
     Nλ=2
-    Sweeps=1
+    Sweeps=10
 
     ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
 end
