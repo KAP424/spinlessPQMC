@@ -1,16 +1,16 @@
 push!(LOAD_PATH,"C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/Hopping/")
 using DelimitedFiles
-using KAPDQMC_spinless_H
+using KAPDQMC_tV
 using LinearAlgebra
 using Random
 
 
 t=1;   Lattice="HoneyComb60"    
-U=5;     Δt=0.05;     Θ=2.0;
+U=2;     Δt=0.05;     Θ=2.0;
 BatchSize=5;
   
 
-L=3
+L=9
 site=[L,L]
 
 path="C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/test/"

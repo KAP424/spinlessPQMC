@@ -75,10 +75,10 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     end
 
     E,V=LAPACK.syevd!('V', 'L',-t.*K[:,:])
-    HalfeK=V*diagm(exp.(-Δt.*E./2))*V'
-    eK=V*diagm(exp.(-Δt.*E))*V'
-    HalfeKinv=V*diagm(exp.(Δt.*E./2))*V'
-    eKinv=V*diagm(exp.(Δt.*E))*V'
+    HalfeK=V*Diagonal(exp.(-Δt.*E./2))*V'
+    eK=V*Diagonal(exp.(-Δt.*E))*V'
+    HalfeKinv=V*Diagonal(exp.(Δt.*E./2))*V'
+    eKinv=V*Diagonal(exp.(Δt.*E))*V'
 
 
     Pt=zeros(Float64,Ns,Int(Ns/2))
@@ -96,7 +96,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
         end
 
         # hopping 扰动，避免能级简并
-        KK[KK .!= 0] .+=( rand(size(KK)...) * 1e-5)[KK.!= 0]
+        KK[KK .!= 0] .+=( rand(size(KK)...) * 1e-3)[KK.!= 0]
         KK=(KK+KK')./2
         
         E,V=LAPACK.syevd!('V', 'L',KK[:,:])

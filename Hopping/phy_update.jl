@@ -14,7 +14,7 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
     elseif model.Lattice=="HoneyComb120" "HC120" 
     else error("Lattice: $(model.Lattice) is not allowed !") end  
 
-    file="$(path)H_phy$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)BS$(model.BatchSize).csv"
+    file="$(path)/H_phy$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)BS$(model.BatchSize).csv"
 
     rng=MersenneTwister(Threads.threadid()+time_ns())
     
@@ -320,12 +320,12 @@ function phy_measure(tmpN,tmpNN,model,G,lt,s)
                             tmp[1]+=(1-G0[idx1,idx1])
                             tmp[2]+=(1-G0[idx1+1,idx1+1])
                             # tmp[1]+=(1-G0[idx1,idx1]) * (1-G0[idx2,idx2]) - G0[idx1,idx2]*G0[idx2,idx1]
-                            # tmp[2]+=(1-G0[idx1+1,idx1+1]) * (1-G0[idx2+1,idx2+1]) - G0[idx1+1,idx2+1]*G[idx2+1,idx1+1]
+                            # tmp[2]+=(1-G0[idx1+1,idx1+1]) * (1-G0[idx2+1,idx2+1]) - G0[idx1+1,idx2+1]*G0[idx2+1,idx1+1]
                         else
                             tmp[1]+=(1-G0[idx1,idx1]) * (1-G0[idx2,idx2]) - G0[idx1,idx2]*G0[idx2,idx1]
-                            tmp[2]+=(1-G0[idx1+1,idx1+1]) * (1-G0[idx2+1,idx2+1]) - G0[idx1+1,idx2+1]*G[idx2+1,idx1+1]
+                            tmp[2]+=(1-G0[idx1+1,idx1+1]) * (1-G0[idx2+1,idx2+1]) - G0[idx1+1,idx2+1]*G0[idx2+1,idx1+1]
                         end
-                        tmp[3]+=(1-G0[idx1+1,idx1+1])*(1-G0[idx2,idx2])-G0[idx1+1,idx2]*G0[idx2,idx1+1]
+                        tmp[3]+=(1-G0[idx1+1,idx1+1])*(1-G0[idx2,idx2])+G0[idx1+1,idx2]*G0[idx2,idx1+1]
                         tmp[4]+=(1-G0[idx1,idx1])*(1-G0[idx2+1,idx2+1])-G0[idx1,idx2+1]*G0[idx2+1,idx1]
                     end
                 end
