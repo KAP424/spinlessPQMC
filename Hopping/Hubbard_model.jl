@@ -85,7 +85,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     if Initial=="H0"
         # 交错化学势，打开gap，去兼并
         KK=K[:,:]
-        μ=0
+        μ=1e-3
         if occursin("HoneyComb", Lattice)
             KK+=μ*diagm(repeat([-1, 1], div(Ns, 2)))
         elseif Lattice=="SQUARE"
@@ -96,10 +96,11 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
         end
 
         # hopping 扰动，避免能级简并
-        KK[KK .!= 0] .+=( rand(size(KK)...) * 1e-3)[KK.!= 0]
-        KK=(KK+KK')./2
+        # KK[KK .!= 0] .+=( ones(size(KK)...) * 1e-3)[KK.!= 0]
+        # KK=(KK+KK')./2
         
         E,V=LAPACK.syevd!('V', 'L',KK[:,:])
+        # Pt.=V[:,1:div(Ns,2)]
         Pt.=V[:,div(Ns,2)+1:end]
     elseif Initial=="V" 
         if occursin("HoneyComb", Lattice)
@@ -146,10 +147,10 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     push!(LOAD_PATH,"C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/Hopping/")
-    using KAPDQMC_spinless_H
+    using KAPDQMC_tV
     using LinearAlgebra,Random
 
-    model=KAPDQMC_spinless_H.Hubbard_Para(1.0,4.0,"HoneyComb120",[3,3],0.1,2.0,10,"H0")
+    model=KAPDQMC_tV.Hubbard_Para(1.0,4.0,"HoneyComb120",[3,3],0.1,2.0,10,"H0")
     println("Hubbard model initialized.")
     s=Initial_s(model,MersenneTwister(1234))
     

@@ -21,7 +21,7 @@ function main()
     s=Initial_s(model,rng)
     path="C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/test/"
 
-    s=phy_update(path,model,s,10,true)
+    s=phy_update(path,model,s,2,true)
 
 
     # Half
@@ -37,7 +37,7 @@ function main()
     Nλ=2
     Sweeps=10
 
-    ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
+    # ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
 end
 
 # main()
@@ -53,14 +53,17 @@ end
 t=1;   Lattice="HoneyComb60"    
 U=0;     Δt=0.02;     Θ=0.0;
 BatchSize=5;
-L=3
+L=9
 site=[L,L]
 
 rng=MersenneTwister(2)
 model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"H0")
 s=Initial_s(model,rng)
 
-println(model.α)
+println(size(model.nnidx))
+println(length(model.nnidx))
+println(model.nnidx[1])
+
 
 G=Gτ(model,s,div(model.Nt,2))
 

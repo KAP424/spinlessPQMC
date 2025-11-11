@@ -1,23 +1,22 @@
 # Trotter e^V1 e^V2 e^V3 e^K
 
 function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::Int64,record::Bool)
+    global LOCK=ReentrantLock()
     Ns=model.Ns
     ns=div(model.Ns, 2)
     NN=length(model.nodes)
-    tau = Vector{Float64}(undef, ns)
-    ipiv = Vector{LAPACK.BlasInt}(undef, ns)
-
+    Θidx=div(NN,2)+1
     uv=[-2^0.5/2 -2^0.5/2;-2^0.5/2 2^0.5/2]
-
     name = if model.Lattice=="SQUARE" "□" 
     elseif model.Lattice=="HoneyComb60" "HC" 
     elseif model.Lattice=="HoneyComb120" "HC120" 
     else error("Lattice: $(model.Lattice) is not allowed !") end  
-
     file="$(path)/H_phy$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)BS$(model.BatchSize).csv"
-
     rng=MersenneTwister(Threads.threadid()+time_ns())
     
+    tau = Vector{Float64}(undef, ns)
+    ipiv = Vector{LAPACK.BlasInt}(undef, ns)
+
     Ek=Ev=0.0
     R0=zeros(Float64,4)
     R1=zeros(Float64,4)
@@ -44,9 +43,6 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
     r = Matrix{Float64}(undef, 2,2)
     Δ = Matrix{Float64}(undef, 2,2)
 
-
-    Θidx=div(length(model.nodes),2)+1
-
     copyto!(view(BRs,:,:,1) , model.Pt)
     transpose!(view(BLs,:,:,NN) , model.Pt)
 
@@ -61,7 +57,7 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
 
     idx=1
     get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,1), view(BRs,:,:,1),G)
-    for loop in 1:Sweeps
+    for _ in 1:Sweeps
         # println("\n Sweep: $loop ")
         for lt in 1:model.Nt
             #####################################################################
@@ -159,7 +155,6 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
 
         end
 
-
         for lt in model.Nt:-1:1
             
             #####################################################################
@@ -181,9 +176,7 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
                         Gupdate!(tmpNN,tmp2N,subidx,r,G)
                         s[lt,i,j]=-s[lt,i,j]
                     end
-                end
-                for i in 1:size(s)[2]
-                    x,y=model.nnidx[i,j]
+
                     tmpN[x]=s[lt,i,j]
                     tmpN[y]=-s[lt,i,j]
                 end
@@ -216,10 +209,10 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{Int8,3},Sweeps::I
         end
 
         if record
-            open(file, "a") do io
-                lock(io)
-                writedlm(io,vcat([Ek,Ev],R0,R1 )'./counter,',')
-                unlock(io)
+            lock(LOCK) do
+                open(file, "a") do io
+                    writedlm(io,vcat([Ek, Ev], R0, R1)' ./ counter, ',')
+                end
             end
             Ek=Ev=0.0
             fill!(R0,0.0)
@@ -253,6 +246,8 @@ function phy_measure(tmpN,tmpNN,model,G,lt,s)
     """
     G0=G[:,:]
     tmp=zeros(Float64,4)
+    R0=zeros(Float64,4)
+    R1=zeros(Float64,4)
     
     if lt>model.Nt/2
         for t in lt:-1:div(model.Nt,2)+1
@@ -283,7 +278,6 @@ function phy_measure(tmpN,tmpNN,model,G,lt,s)
                     tmpN[y]=-s[t,i,j]
                 end
                 tmpN.= exp.(model.α.*tmpN)
-
                 WrapV!(tmpNN,G0,tmpN,view(model.UV,:,:,j),3)
                 # G0=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:]
             end
@@ -302,12 +296,10 @@ function phy_measure(tmpN,tmpNN,model,G,lt,s)
     Ev=0.0
     for k in 1:length(model.nnidx)
         x,y=model.nnidx[k]
-        Ev+=(1-G0[x,x])*(1-G0[y,y])-G0[x,y]*G0[y,x]-1/4
+        Ev+=(1-G0[x,x])*(1-G0[y,y])-G0[x,y]*G0[y,x]
     end
-    Ev*=model.U
+    # Ev*=model.U
 
-    R0=zeros(Float64,4)
-    R1=zeros(Float64,4)
     if occursin("HoneyComb", model.Lattice)
         for rx in 1:model.site[1]
             for ry in 1:model.site[2]
@@ -325,12 +317,12 @@ function phy_measure(tmpN,tmpNN,model,G,lt,s)
                             tmp[1]+=(1-G0[idx1,idx1]) * (1-G0[idx2,idx2]) - G0[idx1,idx2]*G0[idx2,idx1]
                             tmp[2]+=(1-G0[idx1+1,idx1+1]) * (1-G0[idx2+1,idx2+1]) - G0[idx1+1,idx2+1]*G0[idx2+1,idx1+1]
                         end
-                        tmp[3]+=(1-G0[idx1+1,idx1+1])*(1-G0[idx2,idx2])+G0[idx1+1,idx2]*G0[idx2,idx1+1]
+                        tmp[3]+=(1-G0[idx1+1,idx1+1])*(1-G0[idx2,idx2])-G0[idx1+1,idx2]*G0[idx2,idx1+1]
                         tmp[4]+=(1-G0[idx1,idx1])*(1-G0[idx2+1,idx2+1])-G0[idx1,idx2+1]*G0[idx2+1,idx1]
                     end
                 end
                 axpy!(1,tmp,R0)
-                axpy!(cos(2*π/model.site[1]*rx+2*π/model.site[2]*ry)/2,tmp,R1)
+                axpy!(cos(2*π/model.site[1]*rx+2*π/model.site[2]*ry),tmp,R1)
             end
         end
         lmul!(4/model.Ns^2,R0)
@@ -343,7 +335,6 @@ function phy_measure(tmpN,tmpNN,model,G,lt,s)
                     for iy in 1:model.site[2]
                         idx1=ix+(iy-1)*model.site[1]
                         idx2=mod1(rx+ix,model.site[1])+mod((ry+iy-1),model.site[2])*model.site[1]
-                        
                         tmp+=(1-G0[idx1,idx1])*(1-G0[idx2,idx2])-G0[idx1,idx2]*G0[idx2,idx1]
                     end
                 end
