@@ -64,7 +64,7 @@ function GroverMatrix!(GM::Matrix{Float64},G1::SubArray{Float64, 2, Matrix{Float
     end
 end
 
-function BM_F!(tmpN,tmpNN,BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
+function BM_F!(tmpN,tmpNN,BM,model::_Hubbard_Para, s::Array{UInt8, 3}, idx::Int64)
     """
     不包头包尾
     """
@@ -80,8 +80,8 @@ function BM_F!(tmpN,tmpNN,BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64
         for j in 3:-1:1
             for i in axes(s,2)
                 x,y=model.nnidx[i,j]
-                tmpN[x]=s[lt,i,j]
-                tmpN[y]=-s[lt,i,j]
+                tmpN[x]=model.η[s[lt,i,j]] 
+                tmpN[y]=-model.η[s[lt,i,j]]
             end
             tmpN.= exp.(model.α.*tmpN)
 
@@ -93,7 +93,7 @@ function BM_F!(tmpN,tmpNN,BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64
     end
 end
 
-function BMinv_F!(tmpN,tmpNN,BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
+function BMinv_F!(tmpN,tmpNN,BM,model::_Hubbard_Para, s::Array{UInt8, 3}, idx::Int64)
     """
     不包头包尾
     """
@@ -109,8 +109,8 @@ function BMinv_F!(tmpN,tmpNN,BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::In
         for j in 3:-1:1
             for i in axes(s,2)
                 x,y=model.nnidx[i,j]
-                tmpN[x]=s[lt,i,j]
-                tmpN[y]=-s[lt,i,j]
+                tmpN[x]=model.η[s[lt,i,j]]
+                tmpN[y]=-model.η[s[lt,i,j]]
             end
             tmpN.= exp.(-model.α.*tmpN)
 
@@ -122,10 +122,10 @@ function BMinv_F!(tmpN,tmpNN,BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::In
     end
 end
 
-function Initial_s(model::_Hubbard_Para,rng::MersenneTwister)::Array{Int8,3}
-    sp=Random.Sampler(rng,[1,-1])
+function Initial_s(model::_Hubbard_Para,rng::MersenneTwister)::Array{UInt8,3}
+    sp=Random.Sampler(rng,[1,2,3,4])
     a,b=size(model.nnidx)
-    s=zeros(Int8,model.Nt,a,b)
+    s=zeros(UInt8,model.Nt,a,b)
 
     for i = 1:size(s)[1]
         for j = 1:size(s)[2]
@@ -142,7 +142,7 @@ end
 # Below is just used for debug
 
 "equal time Green function"
-function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
+function Gτ(model::_Hubbard_Para,s::Array{UInt8,3},τ::Int64)::Array{Float64,2}
     BL::Array{Float64,2}=model.Pt'[:,:]
     BR::Array{Float64,2}=model.Pt[:,:]
 
@@ -153,8 +153,8 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
             fill!(E,0.0)
             for i in 1:size(s)[2]
                 x,y=model.nnidx[i,j]
-                E[x]=s[lt,i,j]
-                E[y]=-s[lt,i,j]
+                E[x]=model.η[s[lt,i,j]]
+                E[y]=-model.η[s[lt,i,j]]
             end
             BL=BL*model.UV[:,:,j]*Diagonal(exp.(model.α*E))*model.UV[:,:,j]'
 
@@ -184,8 +184,8 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
             fill!(E,0.0)
             for i in 1:size(s)[2]
                 x,y=model.nnidx[i,j]
-                E[x]=s[lt,i,j]
-                E[y]=-s[lt,i,j]
+                E[x]=model.η[s[lt,i,j]]
+                E[y]=-model.η[s[lt,i,j]]
             end
             BR=model.UV[:,:,j]*Diagonal(exp.(model.α*E))*model.UV[:,:,j]' *BR
             #####################################################################
@@ -216,7 +216,7 @@ end
 
 
 "displaced Green function G(τ₁,τ₂)"
-function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
+function G4(model::_Hubbard_Para,s::Array{UInt8,3},τ1::Int64,τ2::Int64)
     if τ1>τ2
         BBs=zeros(Float64,cld(τ1-τ2,model.BatchSize),model.Ns,model.Ns)
         BBsInv=zeros(Float64,size(BBs))
@@ -235,8 +235,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
                 E=zeros(model.Ns)
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
-                    E[x]=s[lt,i,j]
-                    E[y]=-s[lt,i,j]
+                    E[x]=model.η[s[lt,i,j]]
+                    E[y]=-model.η[s[lt,i,j]]
                 end
                 UR[1,:,:]=model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'*UR[1,:,:]
             end
@@ -255,8 +255,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
                 E=zeros(model.Ns)
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
-                    E[x]=s[lt,i,j]
-                    E[y]=-s[lt,i,j]
+                    E[x]=model.η[s[lt,i,j]]
+                    E[y]=-model.η[s[lt,i,j]]
                 end
                 UL[end,:,:]=UL[end,:,:]*model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'
             end
@@ -299,8 +299,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
                 E=zeros(model.Ns)
                 for i in 1:size(s)[2]
                     x,y=model.nnidx[i,j]
-                    E[x]=s[lt,i,j]
-                    E[y]=-s[lt,i,j]
+                    E[x]=model.η[s[lt,i,j]]
+                    E[y]=-model.η[s[lt,i,j]]
                 end
                 BBs[end,:,:]=model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'*BBs[end,:,:]
                 BBsInv[end,:,:]=BBsInv[end,:,:]*model.UV[:,:,j]*Diagonal(exp.(-model.α.*E))*model.UV[:,:,j]' 

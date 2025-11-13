@@ -1,4 +1,4 @@
-# using density channel ±1 HS transformation
+# using density channel ±1,±2 HS transformation
 
 # mutable
 struct _Hubbard_Para
@@ -14,6 +14,8 @@ struct _Hubbard_Para
     WrapTime::Int64
     Δt::Float64
     α::Float64
+    γ::Vector{Float64}
+    η::Vector{Float64}
     Pt::Array{Float64,2}
     HalfeK::Array{Float64,2}
     eK::Array{Float64,2}
@@ -29,7 +31,9 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     Nt::Int64=2*cld(Θ,Δt)
     WrapTime::Int64=div(BatchSize,2)
     
-    α::Float64=acosh(exp(Δt*U/2)) 
+    α = sqrt(Δt * U / 2)
+    γ = [1 + sqrt(6) / 3, 1 + sqrt(6) / 3, 1 - sqrt(6) / 3, 1 - sqrt(6) / 3]
+    η = [sqrt(2 * (3 - sqrt(6))), -sqrt(2 * (3 - sqrt(6))), sqrt(2 * (3 + sqrt(6))), -sqrt(2 * (3 + sqrt(6)))]
     
     K=K_Matrix(Lattice,site)
     Ns=size(K)[1]
@@ -96,7 +100,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
         # end
 
         # hopping 扰动，避免能级简并
-        KK[KK .!= 0] .+=( ones(size(KK)...) * 1e-3)[KK.!= 0]
+        KK[KK .!= 0] .+=( rand(size(KK)...) * 1e-3)[KK.!= 0]
         KK=(KK+KK')./2
         
         E,V=LAPACK.syevd!('V', 'L',KK[:,:])
@@ -139,7 +143,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
         nodes = vcat(0, reverse(collect(div(Nt, 2) - BatchSize:-BatchSize:1)), collect(div(Nt, 2):BatchSize:Nt), Nt)
     end
 
-    return _Hubbard_Para(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,WrapTime,Δt,α,Pt,HalfeK,eK,HalfeKinv,eKinv,nnidx,UV,nodes)
+    return _Hubbard_Para(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,WrapTime,Δt,α,γ,η,Pt,HalfeK,eK,HalfeKinv,eKinv,nnidx,UV,nodes)
 
 end
 
@@ -164,11 +168,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
         for i in 1:div(model.Ns,2)
             # println(i," ",j,": ",model.nnidx[i,j])
             x,y=model.nnidx[i,j]
-            tmpN[x]=s[lt,i,j]
-            tmpN[y]=-s[lt,i,j]
-
-            tmpV[x,y]=s[lt,i,j]
-            tmpV[y,x]=s[lt,i,j]
+            tmpN[x]=model.η[s[lt,i,j]]
+            tmpN[y]=-model.η[s[lt,i,j]]
+            
+            tmpV[x,y]=model.η[s[lt,i,j]]
+            tmpV[y,x]=model.η[s[lt,i,j]]
         end
         tmpVV[j,:,:]=tmpV[:,:]
         @assert norm(model.UV[:,:,j]*Diagonal(tmpN)*model.UV[:,:,j]'-tmpV)<1e-5
@@ -193,9 +197,13 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     # TEST for diag transformation of update UV*Diagonal(s)*UV' = V
     uv=[-2^0.5/2 -2^0.5/2;-2^0.5/2 2^0.5/2]
-    tmp22= [0 -2 ; -2.0  0]
-    tmp2=[-2,2]
-    println(norm(uv*Diagonal(tmp2)*uv' .- tmp22))
+    for sx_f in 1:4
+        for sx_i in 1:4
+            tmp22= (model.η[sx_f]-model.η[sx_i])*[0 1 ; 1.0 0]
+            tmp2=(model.η[sx_f]-model.η[sx_i])*[1,-1]
+            println(norm(uv*Diagonal(tmp2)*uv' .- tmp22))
+        end
+    end
 end
 
 

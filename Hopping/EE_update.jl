@@ -1,7 +1,7 @@
 
 
 
-function ctrl_EEicr(path::String,model::_Hubbard_Para,index::Vector{Int64},Sweeps::Int64,λ::Float64,Nλ::Int64,ss::Vector{Array{Int8,3}},record::Bool)::Vector{Array{Int8,3}}
+function ctrl_EEicr(path::String,model::_Hubbard_Para,index::Vector{Int64},Sweeps::Int64,λ::Float64,Nλ::Int64,ss::Vector{Array{UInt8,3}},record::Bool)::Vector{Array{UInt8,3}}
     uv=[-2^0.5/2 -2^0.5/2;-2^0.5/2 2^0.5/2]
     if model.Lattice=="SQUARE"
         name="□"

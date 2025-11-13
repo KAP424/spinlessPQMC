@@ -9,7 +9,7 @@ function main()
     rng=MersenneTwister(time_ns())
 
     t=1;   Lattice="HoneyComb60"    
-    U=2;     Δt=0.05;     Θ=10;
+    U=1;     Δt=0.05;     Θ=0.1;
     BatchSize=5;
 
     L=6
@@ -21,26 +21,26 @@ function main()
     s=Initial_s(model,rng)
     path="C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/test/"
 
-    # s=phy_update(path,model,s,2,true)
+    s=phy_update(path,model,s,2,true)
 
 
-    # Half
-    indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
-    # println(indexA)
+    # # Half
+    # indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
+    # # println(indexA)
 
-    # HalfHalf
-    indexB=area_index(Lattice,site,([1,1],[div(L,3),div(2*L,3)]))
-    # println(indexB)
+    # # HalfHalf
+    # indexB=area_index(Lattice,site,([1,1],[div(L,3),div(2*L,3)]))
+    # # println(indexB)
 
-    ss=[s[:,:,:],s[:,:,:]]
-    λ=0.5
-    Nλ=2
-    Sweeps=10
+    # ss=[s[:,:,:],s[:,:,:]]
+    # λ=0.5
+    # Nλ=2
+    # Sweeps=10
 
-    ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
+    # ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
 end
 
-# main()
+main()
 # println(@btime main())
 # NO MKL 241.254 ms (204009 allocations: 15.66 MiB)
 # With MKL 782.518 ms (204056 allocations: 15.87 MiB)
@@ -50,28 +50,28 @@ end
 # 168.357 s (3793634 allocations: 866.99 MiB)
 
 # -----------------------------------------------
-t=1;   Lattice="HoneyComb60"    
-U=0;     Δt=0.02;     Θ=0.0;
-BatchSize=5;
-L=9
-site=[L,L]
+# t=1;   Lattice="HoneyComb60"    
+# U=0;     Δt=0.02;     Θ=0.0;
+# BatchSize=5;
+# L=9
+# site=[L,L]
 
-rng=MersenneTwister(2)
-model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
-s=Initial_s(model,rng)
+# rng=MersenneTwister(2)
+# model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
+# s=Initial_s(model,rng)
 
-println(size(model.nnidx))
-println(length(model.nnidx))
-println(model.nnidx[1])
+# println(size(model.nnidx))
+# println(length(model.nnidx))
+# println(model.nnidx[1])
 
 
-G=Gτ(model,s,div(model.Nt,2))
+# G=Gτ(model,s,div(model.Nt,2))
 
-tmpN=Vector{Float64}(undef,model.Ns)
-tmpNN=Matrix{Float64}(undef,model.Ns,model.Ns)
-E,V,R0,R1=phy_measure(tmpN,tmpNN,model,G,div(model.Nt,2),s)  
-println("E: ",E,"  V: ",V)
-println("R0: ",R0,"\nR1: ",R1)
+# tmpN=Vector{Float64}(undef,model.Ns)
+# tmpNN=Matrix{Float64}(undef,model.Ns,model.Ns)
+# E,V,R0,R1=phy_measure(tmpN,tmpNN,model,G,div(model.Nt,2),s)  
+# println("E: ",E,"  V: ",V)
+# println("R0: ",R0,"\nR1: ",R1)
 # -----------------------------------------------
 
 

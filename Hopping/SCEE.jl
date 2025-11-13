@@ -1,7 +1,7 @@
 # For particle hole symmetric of t-V model
 # attractive-U and repulsive-U get the same S_2
 
-function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},indexB::Vector{Int64},Sweeps::Int64,λ::Float64,Nλ::Int64,ss::Vector{Array{Int8,3}},record)
+function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},indexB::Vector{Int64},Sweeps::Int64,λ::Float64,Nλ::Int64,ss::Vector{Array{UInt8,3}},record)
     global LOCK=ReentrantLock()
     Ns=model.Ns
     ns=div(Ns, 2)
