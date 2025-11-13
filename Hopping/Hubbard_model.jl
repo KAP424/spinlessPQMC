@@ -89,19 +89,19 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     if Initial=="H0"
         KK=K[:,:]
         # 交错化学势，打开gap，去兼并
-        # μ=1e-3
-        # if occursin("HoneyComb", Lattice)
-        #     KK+=μ*Diagonal(repeat([-1, 1], div(Ns, 2)))
-        # elseif Lattice=="SQUARE"
-        #     for i in 1:Ns
-        #         x,y=i_xy(Lattice,site,i)
-        #         KK[i,i]+=μ*(-1)^(x+y)
-        #     end
-        # end
+        μ=1e-3
+        if occursin("HoneyComb", Lattice)
+            KK+=μ*(rand()-0.5)*Diagonal(repeat([-1, 1], div(Ns, 2)))
+        elseif Lattice=="SQUARE"
+            for i in 1:Ns
+                x,y=i_xy(Lattice,site,i)
+                KK[i,i]+=μ*(-1)^(x+y)
+            end
+        end
 
         # hopping 扰动，避免能级简并
-        KK[KK .!= 0] .+=( rand(size(KK)...) * 1e-3)[KK.!= 0]
-        KK=(KK+KK')./2
+        # KK[KK .!= 0] .+=( rand(size(KK)...) * 1e-3)[KK.!= 0]
+        # KK=(KK+KK')./2
         
         E,V=LAPACK.syevd!('V', 'L',KK[:,:])
         # Pt.=V[:,1:div(Ns,2)]
