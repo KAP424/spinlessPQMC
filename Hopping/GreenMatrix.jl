@@ -2,6 +2,126 @@
 # using Hopping channel ±1 HS transformation
 # Trotter e^V1 e^V2 e^V3 e^K
 
+function G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt::Array{Float64, 2},G0::Array{Float64, 2},Gt0::Array{Float64, 2},G0t::Array{Float64, 2},nodes::Vector{Int64},idx::Int64,BLMs::Array{Float64,3},BRMs::Array{Float64,3},BMs::Array{Float64,3},BMinvs::Array{Float64,3},direction="Forward")
+    Θidx=div(length(nodes),2)+1
+
+    get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,idx),view(BRMs,:,:,idx),Gt)
+    
+    if idx==Θidx
+        G0 .= Gt
+        if direction=="Forward"
+            Gt0.= Gt
+            G0t.= Gt .- II 
+        elseif direction=="Backward"
+            Gt0.= Gt .- II
+            G0t.= Gt
+        end
+    else
+        get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,Θidx),view(BRMs,:,:,Θidx),G0)
+    
+        Gt0 .= II
+        G0t .= II
+        if idx<Θidx
+            for j in idx:Θidx-1
+                if j==idx
+                    tmpNN2 .= Gt
+                else
+                    get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,j),view(BRMs,:,:,j),tmpNN2)
+                end
+                mul!(tmpNN,tmpNN2, G0t)
+                mul!(G0t, view(BMs,:,:,j), tmpNN)
+                tmpNN .= II .- tmpNN2
+                mul!(tmpNN2,Gt0, tmpNN)
+                mul!(Gt0, tmpNN2, view(BMinvs,:,:,j))
+                
+            end
+            lmul!(-1.0, Gt0)
+        else
+            for j in Θidx:idx-1
+                if j==Θidx
+                    tmpNN2 .= G0
+                else
+                    get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,j),view(BRMs,:,:,j),tmpNN2)
+                end
+                mul!(tmpNN, tmpNN2, Gt0)
+                mul!(Gt0, view(BMs,:,:,j), tmpNN)
+                tmpNN .= II .- tmpNN2
+                mul!(tmpNN2, G0t, tmpNN)
+                mul!(G0t, tmpNN2,view(BMinvs,:,:,j))
+            end
+            lmul!(-1.0, G0t)
+        end        
+    end
+end
+
+function GroverMatrix!(GM::Matrix{Float64},G1::SubArray{Float64, 2, Matrix{Float64}, Tuple{Vector{Int64}, Vector{Int64}}, false},G2::SubArray{Float64, 2, Matrix{Float64}, Tuple{Vector{Int64}, Vector{Int64}}, false})
+    mul!(GM,G1,G2)
+    lmul!(2.0, GM)
+    axpy!(-1.0, G1, GM)
+    axpy!(-1.0, G2, GM)
+    for i in diagind(GM)
+        GM[i] += 1.0
+    end
+end
+
+function BM_F!(tmpN,tmpNN,BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
+    """
+    不包头包尾
+    """
+    @assert 0< idx <=length(model.nodes)
+
+    fill!(tmpNN,0)
+    @inbounds for i in diagind(tmpNN)
+        tmpNN[i] = 1
+    end
+
+    for lt in model.nodes[idx] + 1:model.nodes[idx + 1]
+        mul!(BM,model.eK,tmpNN)
+        for j in 3:-1:1
+            for i in axes(s,2)
+                x,y=model.nnidx[i,j]
+                tmpN[x]=s[lt,i,j]
+                tmpN[y]=-s[lt,i,j]
+            end
+            tmpN.= exp.(model.α.*tmpN)
+
+            mul!(tmpNN,view(model.UV,:,:,j),BM)
+            mul!(BM,Diagonal(tmpN),tmpNN)
+            mul!(tmpNN,view(model.UV,:,:,j)',BM)
+            copyto!(BM,tmpNN)
+        end
+    end
+end
+
+function BMinv_F!(tmpN,tmpNN,BM,model::_Hubbard_Para, s::Array{Int8, 3}, idx::Int64)
+    """
+    不包头包尾
+    """
+    @assert 0< idx <=length(model.nodes)
+
+    fill!(tmpNN,0)
+    @inbounds for i in diagind(tmpNN)
+        tmpNN[i] = 1
+    end
+
+    for lt in model.nodes[idx] + 1:model.nodes[idx + 1]
+        mul!(BM,tmpNN,model.eKinv)
+        for j in 3:-1:1
+            for i in axes(s,2)
+                x,y=model.nnidx[i,j]
+                tmpN[x]=s[lt,i,j]
+                tmpN[y]=-s[lt,i,j]
+            end
+            tmpN.= exp.(-model.α.*tmpN)
+
+            mul!(tmpNN,BM,view(model.UV,:,:,j))
+            mul!(BM,tmpNN,Diagonal(tmpN))
+            mul!(tmpNN,BM,view(model.UV,:,:,j)')
+            copyto!(BM,tmpNN)
+        end
+    end
+end
+
 function Initial_s(model::_Hubbard_Para,rng::MersenneTwister)::Array{Int8,3}
     sp=Random.Sampler(rng,[1,-1])
     a,b=size(model.nnidx)
@@ -17,21 +137,26 @@ function Initial_s(model::_Hubbard_Para,rng::MersenneTwister)::Array{Int8,3}
     return s
 end
 
+
+
+# Below is just used for debug
+
 "equal time Green function"
 function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
     BL::Array{Float64,2}=model.Pt'[:,:]
     BR::Array{Float64,2}=model.Pt[:,:]
 
+    E=zeros(model.Ns)
     counter=0
     for lt in model.Nt:-1:τ+1
         for j in 1:size(s)[3]
-            E=zeros(model.Ns)
+            fill!(E,0.0)
             for i in 1:size(s)[2]
                 x,y=model.nnidx[i,j]
                 E[x]=s[lt,i,j]
                 E[y]=-s[lt,i,j]
             end
-            BL=BL*model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
+            BL=BL*model.UV[:,:,j]*Diagonal(exp.(model.α*E))*model.UV[:,:,j]'
 
             #####################################################################
             # V=zeros(Float64,model.Ns,model.Ns)
@@ -39,7 +164,7 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
             #     x,y=model.nnidx[i,j]
             #     V[x,y]=V[y,x]=s[lt,i,j]
             # end
-            # tmp=model.UV[j,:,:]'*diagm(E)*model.UV[j,:,:]
+            # tmp=model.UV[:,:,j]'*diagm(E)*model.UV[:,:,j]
             # if norm(tmp-V)>1e-6
             #     println("diagnose error")
             # end
@@ -56,20 +181,20 @@ function Gτ(model::_Hubbard_Para,s::Array{Int8,3},τ::Int64)::Array{Float64,2}
     for lt in 1:1:τ
         BR=model.eK*BR
         for j in size(s)[3]:-1:1
-            E=zeros(model.Ns)
+            fill!(E,0.0)
             for i in 1:size(s)[2]
                 x,y=model.nnidx[i,j]
                 E[x]=s[lt,i,j]
                 E[y]=-s[lt,i,j]
             end
-            BR=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:] *BR
+            BR=model.UV[:,:,j]*Diagonal(exp.(model.α*E))*model.UV[:,:,j]' *BR
             #####################################################################
             # V=zeros(Float64,model.Ns,model.Ns)
             # for i in 1:size(s)[2]
             #     x,y=model.nnidx[i,j]
             #     V[x,y]=V[y,x]=s[lt,i,j]
             # end
-            # tmp=model.UV[j,:,:]'*diagm(E)*model.UV[j,:,:]
+            # tmp=model.UV[:,:,j]'*diagm(E)*model.UV[:,:,j]
             # if norm(tmp-V)>1e-6
             #     println("diagnose error")
             # end
@@ -113,7 +238,7 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
                     E[x]=s[lt,i,j]
                     E[y]=-s[lt,i,j]
                 end
-                UR[1,:,:]=model.UV[j,:,:]'*diagm(exp.(model.α.*E))*model.UV[j,:,:]*UR[1,:,:]
+                UR[1,:,:]=model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'*UR[1,:,:]
             end
 
             counter+=1
@@ -133,7 +258,7 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
                     E[x]=s[lt,i,j]
                     E[y]=-s[lt,i,j]
                 end
-                UL[end,:,:]=UL[end,:,:]*model.UV[j,:,:]'*diagm(exp.(model.α.*E))*model.UV[j,:,:]
+                UL[end,:,:]=UL[end,:,:]*model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'
             end
             UL[end,:,:]=UL[end,:,:]*model.eK
 
@@ -158,8 +283,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
                         E[x]=s[τ2+(lt-1)*model.BatchSize+lt2,i,j]
                         E[y]=-s[τ2+(lt-1)*model.BatchSize+lt2,i,j]
                     end
-                    BBs[lt,:,:]=model.UV[j,:,:]'*diagm(exp.(model.α.*E))*model.UV[j,:,:]*BBs[lt,:,:]
-                    BBsInv[lt,:,:]=BBsInv[lt,:,:]*model.UV[j,:,:]'*diagm(exp.(-model.α.*E))*model.UV[j,:,:]
+                    BBs[lt,:,:]=model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'*BBs[lt,:,:]
+                    BBsInv[lt,:,:]=BBsInv[lt,:,:]*model.UV[:,:,j]*Diagonal(exp.(-model.α.*E))*model.UV[:,:,j]'
 
                 end
             end
@@ -177,8 +302,8 @@ function G4(model::_Hubbard_Para,s::Array{Int8,3},τ1::Int64,τ2::Int64)
                     E[x]=s[lt,i,j]
                     E[y]=-s[lt,i,j]
                 end
-                BBs[end,:,:]=model.UV[j,:,:]'*diagm(exp.(model.α.*E))*model.UV[j,:,:]*BBs[end,:,:]
-                BBsInv[end,:,:]=BBsInv[end,:,:]*model.UV[j,:,:]'*diagm(exp.(-model.α.*E))*model.UV[j,:,:]
+                BBs[end,:,:]=model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'*BBs[end,:,:]
+                BBsInv[end,:,:]=BBsInv[end,:,:]*model.UV[:,:,j]*Diagonal(exp.(-model.α.*E))*model.UV[:,:,j]' 
             end
         end
     

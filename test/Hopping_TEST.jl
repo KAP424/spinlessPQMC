@@ -1,45 +1,96 @@
-push!(LOAD_PATH,"E:/桌面/JuliaDQMC/code/spinlessPQMC/Hopping/")
+push!(LOAD_PATH,"C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/Hopping/")
 using DelimitedFiles
-
-using KAPDQMC_spinless_M
+using BenchmarkTools
+using KAPDQMC_tV
 using LinearAlgebra
 using Random
-rng=MersenneTwister(1)
 
-t=1;   Lattice="HoneyComb"    
-U=8;     Δt=0.05;     Θ=0.2;
-BatchSize=10;
-  
+function main()
+    rng=MersenneTwister(time_ns())
 
-L=3
+    t=1;   Lattice="HoneyComb60"    
+    U=2;     Δt=0.05;     Θ=10;
+    BatchSize=5;
+
+    L=6
+    site=[L,L]
+
+    model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
+    println(model.nodes)
+
+    s=Initial_s(model,rng)
+    path="C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/test/"
+
+    # s=phy_update(path,model,s,2,true)
+
+
+    # Half
+    indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
+    # println(indexA)
+
+    # HalfHalf
+    indexB=area_index(Lattice,site,([1,1],[div(L,3),div(2*L,3)]))
+    # println(indexB)
+
+    ss=[s[:,:,:],s[:,:,:]]
+    λ=0.5
+    Nλ=2
+    Sweeps=10
+
+    ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
+end
+
+# main()
+# println(@btime main())
+# NO MKL 241.254 ms (204009 allocations: 15.66 MiB)
+# With MKL 782.518 ms (204056 allocations: 15.87 MiB)
+# First 304.746 ms (537237 allocations: 457.84 MiB)
+# Secord 251.443 ms (204507 allocations: 20.56 MiB)
+# 959.025 ms (810702 allocations: 63.29 MiB)
+# 168.357 s (3793634 allocations: 866.99 MiB)
+
+# -----------------------------------------------
+t=1;   Lattice="HoneyComb60"    
+U=0;     Δt=0.02;     Θ=0.0;
+BatchSize=5;
+L=9
 site=[L,L]
 
+rng=MersenneTwister(2)
 model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
-
 s=Initial_s(model,rng)
-G0=Gτ(model,s,div(model.Nt,2))
-Gt,G0,Gt0,G0t=G4(model,s,div(model.Nt,2),2)
+
+println(size(model.nnidx))
+println(length(model.nnidx))
+println(model.nnidx[1])
 
 
-path="E:/桌面/JuliaDQMC/code/spinlessPQMC/test/"
-# s=phy_update(path,model,s,3,false)
-# s=phy_update(path,model,s,500,true)
+G=Gτ(model,s,div(model.Nt,2))
+
+tmpN=Vector{Float64}(undef,model.Ns)
+tmpNN=Matrix{Float64}(undef,model.Ns,model.Ns)
+E,V,R0,R1=phy_measure(tmpN,tmpNN,model,G,div(model.Nt,2),s)  
+println("E: ",E,"  V: ",V)
+println("R0: ",R0,"\nR1: ",R1)
+# -----------------------------------------------
 
 
-# # Half
-indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
-println(indexA)
+# -----------------------------------------------
+# BR=model.HalfeK*model.Pt
 
-# # HalfHalf
-indexB=area_index(Lattice,site,([1,1],[div(L,3),div(2*L,3)]))
-println(indexB)
+# BL=model.Pt'*model.HalfeKinv
 
-ss=[s[:,:,:],s[:,:,:]]
-λ=0.5
-Nλ=2
-Sweeps=1
 
-ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
+# println(norm(BL*BR-I(div(model.Ns,2))))
+
+# -----------------------------------------------
+
+
+# s=phy_update(path,model,s,30,true)
+
+
+
+# ss=ctrl_EEicr(path,model,indexA,Sweeps,λ,Nλ,ss,true)
 
 # ----------------------------------------------------------------------------------------
 # print(norm(Gt-G0))
@@ -93,9 +144,26 @@ ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
 
 
 
+# using LinearAlgebra
+
+# A=rand(Float64,10,2)
+# B=rand(Float64,2,10)
+
+# r1=det(I(10)+A*B)
+
+# r2=1+dot(A[:,1],B[1,:])+dot(A[:,2],B[2,:])
+# r2=1+dot(A[:,1]+A[:,2],B[1,:]+B[2,:])
+
+# r2=det(I(2)+B*A)
 
 
+# function dot22(A,B)
+#     return dot(A[:,1],B[1,:])+dot(A[:,2],B[2,:])+dot(A[:,1],B[2,:])*dot(A[:,2],B[1,:])
+# end
 
 
+# rho1=inv(I(10)+A*B)
 
+# rho2=I(10)-A*inv(I(2)+B*A)*B
 
+# norm(rho1-rho2)
