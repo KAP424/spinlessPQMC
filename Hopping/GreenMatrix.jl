@@ -2,7 +2,7 @@
 # using Hopping channel ±1 HS transformation
 # Trotter e^V1 e^V2 e^V3 e^K
 
-function G4!(tmpG::tmpGMWorkspace,G4::G4Workspace,nodes::Vector{Int64},idx::Int64,BLMs::Array{Float64,3},BRMs::Array{Float64,3},BMs::Array{Float64,3},BMinvs::Array{Float64,3},direction="Forward")
+function G4!(tmpG::tmpSCEEWorkspace,G4::G4Workspace,nodes::Vector{Int64},idx::Int64,BLMs::Array{Float64,3},BRMs::Array{Float64,3},BMs::Array{Float64,3},BMinvs::Array{Float64,3},direction="Forward")
     II=Diagonal(ones(Float64,size(BLMs)[2]))
     
     Θidx=div(length(nodes),2)+1
@@ -28,7 +28,7 @@ function G4!(tmpG::tmpGMWorkspace,G4::G4Workspace,nodes::Vector{Int64},idx::Int6
                 if j==idx
                     tmpG.NN_ .= G4.t
                 else
-                    get_G!(tmpG,view(BLMs,:,:,j),view(BRMs,:,:,j),G4.NN_)
+                    get_G!(tmpG,view(BLMs,:,:,j),view(BRMs,:,:,j),tmpG.NN_)
                 end
                 mul!(tmpG.NN,tmpG.NN_, G4.Ot)
                 mul!(G4.Ot, view(BMs,:,:,j), tmpG.NN)

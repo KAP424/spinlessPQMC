@@ -1,21 +1,4 @@
 # Trotter e^V1 e^V2 e^V3 e^K
-mutable struct tmpGWorkspace 
-    Δ::Matrix{Float64}
-    r::Matrix{Float64}
-    N::Vector{Float64}
-    N_::Vector{Float64}
-    NN::Matrix{Float64}
-    NN_::Matrix{Float64}
-    Nn::Matrix{Float64}
-    nN::Matrix{Float64}
-    nn::Matrix{Float64}
-    N2::Matrix{Float64}
-    zN::Matrix{Float64}
-    zz::Matrix{Float64}
-    z::Vector{Float64}
-    ipiv::Vector{LAPACK.BlasInt}
-    uv::Matrix{Float64}
-end
 
 function phy_update(path::String,model::_Hubbard_Para,s::Array{UInt8,3},Sweeps::Int64,record::Bool)
     global LOCK=ReentrantLock()
@@ -29,12 +12,6 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{UInt8,3},Sweeps::
     else error("Lattice: $(model.Lattice) is not allowed !") end  
     file="$(path)/H_phy$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)BS$(model.BatchSize).csv"
     rng=MersenneTwister(Threads.threadid()+time_ns())
-    elements = (1, 2, 3, 4)
-    samplers_dict = Dict{UInt8, Random.Sampler}()
-    for excluded in elements
-        allowed = [i for i in elements if i != excluded]
-        samplers_dict[excluded] = Random.Sampler(rng, allowed)
-    end
 
     tau = Vector{Float64}(undef, ns)
 
@@ -51,12 +28,10 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{UInt8,3},Sweeps::
     BM = Matrix{Float64}(undef, Ns, Ns)
 
     # 预分配临时数组
-    tmpG=tmpGWorkspace(
+    tmpG=tmpPhyWorkspace(
         Matrix{Float64}(undef, 2,2),
         Matrix{Float64}(undef, 2,2),
         Vector{Float64}(undef, Ns),
-        Vector{Float64}(undef, Ns),
-        Matrix{Float64}(undef, Ns, Ns),
         Matrix{Float64}(undef, Ns, Ns),
         Matrix{Float64}(undef, Ns, ns),
         Matrix{Float64}(undef, ns, Ns),
@@ -105,9 +80,9 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{UInt8,3},Sweeps::
                 end
                 tmpG.N.= exp.(model.α.*tmpG.N)
 
-                WrapV!(tmpG,G,view(model.UV,:,:,j),3)
+                WrapV!(tmpG,G,view(model.UV,:,:,j),"B")
 
-                phy_LayerUpdate!(tmpG,j,rng,samplers_dict,model,G,view(s,lt,:,j))
+                phy_LayerUpdate!(tmpG,j,rng,model,G,view(s,lt,:,j))
             end
 
             if record && abs(idx-Θidx)<=1
@@ -150,14 +125,14 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{UInt8,3},Sweeps::
             ######################################################################
 
             for j in 1:size(s)[3]
-                phy_LayerUpdate!(tmpG,j,rng,samplers_dict,model,G,view(s,lt,:,j))
+                phy_LayerUpdate!(tmpG,j,rng,model,G,view(s,lt,:,j))
                 for i in axes(s,2)
                     x,y=model.nnidx[i,j]
                     tmpG.N[x]=model.η[s[lt,i,j]]
                     tmpG.N[y]=-model.η[s[lt,i,j]]
                 end
                 tmpG.N.=exp.(.-model.α.*tmpG.N)
-                WrapV!(tmpG,G,view(model.UV,:,:,j),3)
+                WrapV!(tmpG,G,view(model.UV,:,:,j),"B")
             end
             mul!(tmpG.NN,model.eKinv,G)
             mul!(G,tmpG.NN,model.eK)
@@ -234,7 +209,7 @@ function phy_measure(tmpG,model,G,lt,s)
                 end
                 tmpG.N.=exp.(.-model.α.*tmpG.N)
 
-                WrapV!(tmpG,G0,view(model.UV,:,:,j),3)
+                WrapV!(tmpG,G0,view(model.UV,:,:,j),"B")
                 # G0=model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
             end
             mul!(tmpG.NN,model.eKinv,G0)
@@ -253,7 +228,7 @@ function phy_measure(tmpG,model,G,lt,s)
                     tmpG.N[y]=-model.η[s[t,i,j]]
                 end
                 tmpG.N.= exp.(model.α.*tmpG.N)
-                WrapV!(tmpG,G0,view(model.UV,:,:,j),3)
+                WrapV!(tmpG,G0,view(model.UV,:,:,j),"B")
                 # G0=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:]
             end
         end
@@ -337,23 +312,23 @@ end
 
 """
     Return p=det(r). Overwrite 
-        Δ = uv ⋅ diag( exp(α⋅[-2s,2s]) - I ) ⋅ uvᵀ 
+        Δ = uv ⋅ diag( exp(α⋅(s′-s)[1,-1]) - I ) ⋅ uvᵀ 
         r = I + Δ ⋅ (I - Gt[subidx,subidx])
         r ≡ inv(r) ⋅ ̇Δ .
     ------------------------------------------------------------------------------
 """
-function get_r!(tmpG::tmpGWorkspace,Δ::Matrix{Float64},r::Matrix{Float64},α::Float64,Δs::Float64,subidx::Vector{Int64},Gt::Matrix{Float64})
+function get_r!(tmpG,α::Float64,Δs::Float64,subidx::Vector{Int64},Gt::Matrix{Float64})
     tmpG.z .= Δs.*[1.0, -1.0]
     tmpG.z .= exp.(α.*tmpG.z).-1
-    mul!(r,tmpG.uv,Diagonal(tmpG.z))
-    mul!(Δ,r,tmpG.uv')
-    mul!(r,Δ,view(Gt,subidx,subidx))
-    axpby!(1.0,Δ, -1.0, r)   # r = I + Δ ⋅ (I - Gt1[subidx,subidx])
-    r[1,1]+=1; r[2,2]+=1;
-    p=det(r)
+    mul!(tmpG.r,tmpG.uv,Diagonal(tmpG.z))
+    mul!(tmpG.Δ,tmpG.r,tmpG.uv')
+    mul!(tmpG.r,tmpG.Δ,view(Gt,subidx,subidx))
+    axpby!(1.0,tmpG.Δ, -1.0, tmpG.r)   # r = I + Δ ⋅ (I - Gt1[subidx,subidx])
+    tmpG.r[1,1]+=1; tmpG.r[2,2]+=1;
+    p=det(tmpG.r)
     # redefine r=inv(r) ⋅ ̇Δ 
-    inv22!(tmpG.zz,r)
-    mul!(r,tmpG.zz,Δ)
+    inv22!(tmpG.zz,tmpG.r)
+    mul!(tmpG.r,tmpG.zz,tmpG.Δ)
     return p
 end
 
@@ -361,7 +336,7 @@ end
     No Return. Overwrite G = G - G · inv(r) ⋅ Δ · (I-G)
     ------------------------------------------------------------------------------
 """
-function Gupdate!(tmpG::tmpGWorkspace,subidx::Vector{Int64},G::Matrix{Float64})
+function Gupdate!(tmpG::tmpPhyWorkspace,subidx::Vector{Int64},G::Matrix{Float64})
     mul!(tmpG.zN,tmpG.r,view(G,subidx,:))
     lmul!(-1.0,tmpG.zN)
     axpy!(1.0,tmpG.r,view(tmpG.zN,:,subidx))   # useful for GΘτ,Gτ
@@ -393,13 +368,13 @@ end
 #     return det(BR)*p
 # end
 
-function phy_LayerUpdate!(tmpG,j,rng,samplers_dict,model,G,s)
+function phy_LayerUpdate!(tmpG,j,rng,model,G,s)
     for i in axes(model.nnidx,1)
         x,y=model.nnidx[i,j]
         subidx=[x,y]
 
-        sx = rand(rng,  samplers_dict[s[i]])
-        p=get_r!(tmpG,tmpG.Δ,tmpG.r,model.α,model.η[sx]- model.η[s[i]],subidx,G)
+        sx = rand(rng,  model.samplers_dict[s[i]])
+        p=get_r!(tmpG,model.α,model.η[sx]- model.η[s[i]],subidx,G)
         p*=model.γ[sx]/model.γ[s[i]]
         if p<-1e-3
             println("Negative Sign: $(p)")
@@ -412,13 +387,13 @@ function phy_LayerUpdate!(tmpG,j,rng,samplers_dict,model,G,s)
     end
 end
 
-function WrapV!(tmpG,G::Matrix{Float64},UV::SubArray{Float64, 2, Array{Float64, 3}},LR::Int64)
-    if LR==1
+function WrapV!(tmpG,G::Matrix{Float64},UV::SubArray{Float64, 2, Array{Float64, 3}},LR::String)
+    if LR=="L"
         mul!(tmpG.NN,UV',G)
         mul!(G,Diagonal(tmpG.N),tmpG.NN)
         mul!(tmpG.NN,UV,G)
         copyto!(G, tmpG.NN)
-    elseif LR==2
+    elseif LR=="R"
         mul!(tmpG.NN, G , UV)
         mul!(G, tmpG.NN , Diagonal(tmpG.N))
         mul!(tmpG.NN, G , UV')

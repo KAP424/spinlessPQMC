@@ -24,8 +24,62 @@ struct _Hubbard_Para
     nnidx::Matrix{Tuple{Int64, Int64}}
     UV::Array{Float64, 3}
     nodes::Vector{Int64}
+    samplers_dict::Dict{UInt8, Random.Sampler}
 end
 
+mutable struct tmpPhyWorkspace 
+    Δ::Matrix{Float64}
+    r::Matrix{Float64}
+    N::Vector{Float64}
+    NN::Matrix{Float64}
+    Nn::Matrix{Float64}
+    nN::Matrix{Float64}
+    nn::Matrix{Float64}
+    N2::Matrix{Float64}
+    zN::Matrix{Float64}
+    zz::Matrix{Float64}
+    z::Vector{Float64}
+    ipiv::Vector{LAPACK.BlasInt}
+    uv::Matrix{Float64}
+end
+
+mutable struct G4Workspace
+    t::Matrix{Float64}
+    O::Matrix{Float64}
+    tO::Matrix{Float64}
+    Ot::Matrix{Float64}
+end
+
+mutable struct tmpSCEEWorkspace 
+    Δ::Matrix{Float64}
+    r::Matrix{Float64}
+    N::Vector{Float64}
+    N_::Vector{Float64}
+    NN::Matrix{Float64}
+    NN_::Matrix{Float64}
+    Nn::Matrix{Float64}
+    nN::Matrix{Float64}
+    nn::Matrix{Float64}
+    N2::Matrix{Float64}
+    zN::Matrix{Float64}
+    zz::Matrix{Float64}
+    z::Vector{Float64}
+    ipiv::Vector{LAPACK.BlasInt}
+    uv::Matrix{Float64}
+end
+
+mutable struct GMWorkspace
+    idx::Vector{Int64}
+    detg::Float64
+    gmInv::Matrix{Float64}
+    a::Matrix{Float64}
+    b::Matrix{Float64}
+    Tau::Matrix{Float64}
+    AA::Matrix{Float64}
+    A2::Matrix{Float64}
+    zA::Matrix{Float64}
+    ipiv::Vector{LAPACK.BlasInt}
+end
 
 function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     Nt::Int64=2*cld(Θ,Δt)
@@ -143,7 +197,15 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
         nodes = vcat(0, reverse(collect(div(Nt, 2) - BatchSize:-BatchSize:1)), collect(div(Nt, 2):BatchSize:Nt), Nt)
     end
 
-    return _Hubbard_Para(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,WrapTime,Δt,α,γ,η,Pt,HalfeK,eK,HalfeKinv,eKinv,nnidx,UV,nodes)
+    rng=MersenneTwister(Threads.threadid()+time_ns())
+    elements = (1, 2, 3, 4)
+    samplers_dict = Dict{UInt8, Random.Sampler}()
+    for excluded in elements
+        allowed = [i for i in elements if i != excluded]
+        samplers_dict[excluded] = Random.Sampler(rng, allowed)
+    end
+
+    return _Hubbard_Para(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,WrapTime,Δt,α,γ,η,Pt,HalfeK,eK,HalfeKinv,eKinv,nnidx,UV,nodes,samplers_dict)
 
 end
 
