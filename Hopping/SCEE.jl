@@ -150,14 +150,14 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
         # println("\n ====== Sweep $loop / $Sweeps ======")
         for lt in 1:model.Nt
             #####################################################################
-            # # println("\n WrapTime check at lt=$lt")
-            Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt-1,div(model.Nt,2),"Forward")
-            Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt-1,div(model.Nt,2),"Forward")
+            # # # println("\n WrapTime check at lt=$lt")
+            # Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt-1,div(model.Nt,2),"Forward")
+            # Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt-1,div(model.Nt,2),"Forward")
                 
-            if norm(Gt1-Gt1_)+norm(Gt2-Gt2_)+norm(Gt01-Gt01_)+norm(Gt02-Gt02_)+norm(G0t1-G0t1_)+norm(G0t2-G0t2_)>1e-3
-                println( norm(Gt1-Gt1_),' ',norm(Gt2-Gt2_),'\n',norm(G01-G01_),' ',norm(G02-G02_),'\n',norm(Gt01-Gt01_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t1-G0t1_),'\n',norm(G0t2-G0t2_) )
-                error("$lt : WrapTime")
-            end
+            # if norm(Gt1-Gt1_)+norm(Gt2-Gt2_)+norm(Gt01-Gt01_)+norm(Gt02-Gt02_)+norm(G0t1-G0t1_)+norm(G0t2-G0t2_)>1e-3
+            #     println( norm(Gt1-Gt1_),' ',norm(Gt2-Gt2_),'\n',norm(G01-G01_),' ',norm(G02-G02_),'\n',norm(Gt01-Gt01_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t1-G0t1_),'\n',norm(G0t2-G0t2_) )
+            #     error("$lt : WrapTime")
+            # end
             #####################################################################
 
             WrapK!(tmpNN,Gt1,Gt01,G0t1,model.eK,model.eKinv)
@@ -207,36 +207,36 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
 
                             ss[1][lt,i,j]=sx
                             #####################################################################
-                            print('-')
-                            Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt-1,div(model.Nt,2),"Forward")
-                            Gt1_=model.eK*Gt1_*model.eKinv
-                            Gt01_=model.eK*Gt01_
-                            G0t1_=G0t1_*model.eKinv
-                            GM_A_=GroverMatrix(G01_[indexA[:],indexA[:]],G02[indexA[:],indexA[:]])
-                            gmInv_A_=inv(GM_A_)
-                            GM_B_=GroverMatrix(G01_[indexB[:],indexB[:]],G02[indexB[:],indexB[:]])
-                            gmInv_B_=inv(GM_B_)
-                            detg_A_=det(GM_A_)
-                            detg_B_=det(GM_B_)
+                            # print('-')
+                            # Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt-1,div(model.Nt,2),"Forward")
+                            # Gt1_=model.eK*Gt1_*model.eKinv
+                            # Gt01_=model.eK*Gt01_
+                            # G0t1_=G0t1_*model.eKinv
+                            # GM_A_=GroverMatrix(G01_[indexA[:],indexA[:]],G02[indexA[:],indexA[:]])
+                            # gmInv_A_=inv(GM_A_)
+                            # GM_B_=GroverMatrix(G01_[indexB[:],indexB[:]],G02[indexB[:],indexB[:]])
+                            # gmInv_B_=inv(GM_B_)
+                            # detg_A_=det(GM_A_)
+                            # detg_B_=det(GM_B_)
 
-                            for jj in size(ss[1])[3]:-1:j
-                                E=zeros(Ns)
-                                for ii in 1:size(ss[1])[2]
-                                    x,y=model.nnidx[ii,jj]
-                                    E[x]=model.η[ss[1][lt,ii,jj]]
-                                    E[y]=-model.η[ss[1][lt,ii,jj]]
-                                end
-                                Gt1_=model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]' *Gt1_* model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]'
-                                Gt01_=model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]'*Gt01_
-                                G0t1_=G0t1_*model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]'
-                            end
+                            # for jj in size(ss[1])[3]:-1:j
+                            #     E=zeros(Ns)
+                            #     for ii in 1:size(ss[1])[2]
+                            #         x,y=model.nnidx[ii,jj]
+                            #         E[x]=model.η[ss[1][lt,ii,jj]]
+                            #         E[y]=-model.η[ss[1][lt,ii,jj]]
+                            #     end
+                            #     Gt1_=model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]' *Gt1_* model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]'
+                            #     Gt01_=model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]'*Gt01_
+                            #     G0t1_=G0t1_*model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]'
+                            # end
         
-                            if norm(Gt1-Gt1_)+norm(G01-G01_)+norm(Gt01-Gt01_)+norm(G0t1-G0t1_)+
-                               norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>1e-3
-                                println('\n',norm(Gt1-Gt1_),'\n',norm(G01-G01_),'\n',norm(Gt01-Gt01_),'\n',norm(G0t1-G0t1_))
-                                println(norm(gmInv_A_-gmInv_A)," ",norm(gmInv_B-gmInv_B_)," ",abs(detg_A-detg_A_)," ",abs(detg_B-detg_B_))
-                                error("s1:  $lt  $j:,,,asdasdasd")
-                            end
+                            # if norm(Gt1-Gt1_)+norm(G01-G01_)+norm(Gt01-Gt01_)+norm(G0t1-G0t1_)+
+                            #    norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>1e-3
+                            #     println('\n',norm(Gt1-Gt1_),'\n',norm(G01-G01_),'\n',norm(Gt01-Gt01_),'\n',norm(G0t1-G0t1_))
+                            #     println(norm(gmInv_A_-gmInv_A)," ",norm(gmInv_B-gmInv_B_)," ",abs(detg_A-detg_A_)," ",abs(detg_B-detg_B_))
+                            #     error("s1:  $lt  $j:,,,asdasdasd")
+                            # end
                             ####################################################################
                         end
                     end
@@ -260,35 +260,35 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
         
                             ss[2][lt,i,j]=sx
                             #####################################################################
-                            Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt-1,div(model.Nt,2),"Forward")
-                            Gt2_=model.eK*Gt2_*model.eKinv
-                            Gt02_=model.eK*Gt02_
-                            G0t2_=G0t2_*model.eKinv
-                            GM_A_=GroverMatrix(G01[indexA[:],indexA[:]],G02_[indexA[:],indexA[:]])
-                            gmInv_A_=inv(GM_A_)
-                            GM_B_=GroverMatrix(G01[indexB[:],indexB[:]],G02_[indexB[:],indexB[:]])
-                            gmInv_B_=inv(GM_B_)
-                            detg_A_=det(GM_A_)
-                            detg_B_=det(GM_B_)
+                            # Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt-1,div(model.Nt,2),"Forward")
+                            # Gt2_=model.eK*Gt2_*model.eKinv
+                            # Gt02_=model.eK*Gt02_
+                            # G0t2_=G0t2_*model.eKinv
+                            # GM_A_=GroverMatrix(G01[indexA[:],indexA[:]],G02_[indexA[:],indexA[:]])
+                            # gmInv_A_=inv(GM_A_)
+                            # GM_B_=GroverMatrix(G01[indexB[:],indexB[:]],G02_[indexB[:],indexB[:]])
+                            # gmInv_B_=inv(GM_B_)
+                            # detg_A_=det(GM_A_)
+                            # detg_B_=det(GM_B_)
 
-                            for jj in size(ss[1])[3]:-1:j
-                                E=zeros(Ns)
-                                for ii in 1:size(ss[1])[2]
-                                    x,y=model.nnidx[ii,jj]
-                                    E[x]=model.η[ss[2][lt,ii,jj]]
-                                    E[y]=-model.η[ss[2][lt,ii,jj]]
-                                end
-                                Gt2_=model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]' *Gt2_* model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]'
-                                Gt02_=model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]'*Gt02_
-                                G0t2_=G0t2_*model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]'
-                            end
+                            # for jj in size(ss[1])[3]:-1:j
+                            #     E=zeros(Ns)
+                            #     for ii in 1:size(ss[1])[2]
+                            #         x,y=model.nnidx[ii,jj]
+                            #         E[x]=model.η[ss[2][lt,ii,jj]]
+                            #         E[y]=-model.η[ss[2][lt,ii,jj]]
+                            #     end
+                            #     Gt2_=model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]' *Gt2_* model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]'
+                            #     Gt02_=model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]'*Gt02_
+                            #     G0t2_=G0t2_*model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]'
+                            # end
         
-                            if norm(Gt2-Gt2_)+norm(G02-G02_)+norm(Gt02-Gt02_)+norm(G0t2-G0t2_)+
-                               norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>1e-3
-                                println('\n',norm(Gt2-Gt2_),'\n',norm(G02-G02_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t2-G0t2_))
-                                println(norm(gmInv_A_-gmInv_A)," ",norm(gmInv_B-gmInv_B_)," ",abs(detg_A-detg_A_)," ",abs(detg_B-detg_B_))
-                                error("s2:  $lt  $x:,,,asdasdasd")
-                            end
+                            # if norm(Gt2-Gt2_)+norm(G02-G02_)+norm(Gt02-Gt02_)+norm(G0t2-G0t2_)+
+                            #    norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>1e-3
+                            #     println('\n',norm(Gt2-Gt2_),'\n',norm(G02-G02_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t2-G0t2_))
+                            #     println(norm(gmInv_A_-gmInv_A)," ",norm(gmInv_B-gmInv_B_)," ",abs(detg_A-detg_A_)," ",abs(detg_B-detg_B_))
+                            #     error("s2:  $lt  $x:,,,asdasdasd")
+                            # end
                             #####################################################################
 
                         end
@@ -352,13 +352,13 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
         for lt in model.Nt:-1:1
             
             #####################################################################
-            Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt,div(model.Nt,2),"Backward")
-            Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt,div(model.Nt,2),"Backward")
+            # Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt,div(model.Nt,2),"Backward")
+            # Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt,div(model.Nt,2),"Backward")
                 
-            if norm(Gt1-Gt1_)+norm(Gt2-Gt2_)+norm(Gt01-Gt01_)+norm(Gt02-Gt02_)+norm(G0t1-G0t1_)+norm(G0t2-G0t2_)>1e-3
-                println( norm(Gt1-Gt1_),'\n',norm(Gt2-Gt2_),'\n',norm(Gt01-Gt01_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t1-G0t1_),'\n',norm(G0t2-G0t2_) )
-                error("$lt : WrapTime")
-            end
+            # if norm(Gt1-Gt1_)+norm(Gt2-Gt2_)+norm(Gt01-Gt01_)+norm(Gt02-Gt02_)+norm(G0t1-G0t1_)+norm(G0t2-G0t2_)>1e-3
+            #     println( norm(Gt1-Gt1_),'\n',norm(Gt2-Gt2_),'\n',norm(Gt01-Gt01_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t1-G0t1_),'\n',norm(G0t2-G0t2_) )
+            #     error("$lt : WrapTime")
+            # end
             #####################################################################
 
             for j in 1:3
@@ -386,34 +386,34 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
 
                             ss[1][lt,i,j]=sx
                             #####################################################################
-                            print('-')
-                            Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt,div(model.Nt,2),"Backward")
+                            # print('-')
+                            # Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt,div(model.Nt,2),"Backward")
                             
-                            GM_A_=GroverMatrix(G01_[indexA[:],indexA[:]],G02[indexA[:],indexA[:]])
-                            gmInv_A_=inv(GM_A_)
-                            GM_B_=GroverMatrix(G01_[indexB[:],indexB[:]],G02[indexB[:],indexB[:]])
-                            gmInv_B_=inv(GM_B_)
-                            detg_A_=det(GM_A_)
-                            detg_B_=det(GM_B_)
+                            # GM_A_=GroverMatrix(G01_[indexA[:],indexA[:]],G02[indexA[:],indexA[:]])
+                            # gmInv_A_=inv(GM_A_)
+                            # GM_B_=GroverMatrix(G01_[indexB[:],indexB[:]],G02[indexB[:],indexB[:]])
+                            # gmInv_B_=inv(GM_B_)
+                            # detg_A_=det(GM_A_)
+                            # detg_B_=det(GM_B_)
 
-                            for jj in 1:j-1
-                                E=zeros(Ns)
-                                for ii in 1:size(ss[1])[2]
-                                    x,y=model.nnidx[ii,jj]
-                                    E[x]=model.η[ss[1][lt,ii,jj]]
-                                    E[y]=-model.η[ss[1][lt,ii,jj]]
-                                end
-                                Gt1_=model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]' *Gt1_* model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]'
-                                Gt01_=model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]'*Gt01_
-                                G0t1_=G0t1_*model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]'
-                            end
+                            # for jj in 1:j-1
+                            #     E=zeros(Ns)
+                            #     for ii in 1:size(ss[1])[2]
+                            #         x,y=model.nnidx[ii,jj]
+                            #         E[x]=model.η[ss[1][lt,ii,jj]]
+                            #         E[y]=-model.η[ss[1][lt,ii,jj]]
+                            #     end
+                            #     Gt1_=model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]' *Gt1_* model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]'
+                            #     Gt01_=model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]'*Gt01_
+                            #     G0t1_=G0t1_*model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]'
+                            # end
         
-                            if norm(Gt1-Gt1_)+norm(G01-G01_)+norm(Gt01-Gt01_)+norm(G0t1-G0t1_)+
-                               norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>1e-3
-                                println('\n',norm(Gt1-Gt1_),'\n',norm(G01-G01_),'\n',norm(Gt01-Gt01_),'\n',norm(G0t1-G0t1_))
-                                println(norm(gmInv_A_-gmInv_A)," ",norm(gmInv_B-gmInv_B_)," ",abs(detg_A-detg_A_)," ",abs(detg_B-detg_B_))
-                                error("s1:  $lt  $j:,,,asdasdasd")
-                            end
+                            # if norm(Gt1-Gt1_)+norm(G01-G01_)+norm(Gt01-Gt01_)+norm(G0t1-G0t1_)+
+                            #    norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>1e-3
+                            #     println('\n',norm(Gt1-Gt1_),'\n',norm(G01-G01_),'\n',norm(Gt01-Gt01_),'\n',norm(G0t1-G0t1_))
+                            #     println(norm(gmInv_A_-gmInv_A)," ",norm(gmInv_B-gmInv_B_)," ",abs(detg_A-detg_A_)," ",abs(detg_B-detg_B_))
+                            #     error("s1:  $lt  $j:,,,asdasdasd")
+                            # end
                             ####################################################################
                         end
                     end
@@ -437,33 +437,33 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
         
                             ss[2][lt,i,j]=sx
                             #####################################################################
-                            print('*')
-                            Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt,div(model.Nt,2),"Backward")
-                            GM_A_=GroverMatrix(G01[indexA[:],indexA[:]],G02_[indexA[:],indexA[:]])
-                            gmInv_A_=inv(GM_A_)
-                            GM_B_=GroverMatrix(G01[indexB[:],indexB[:]],G02_[indexB[:],indexB[:]])
-                            gmInv_B_=inv(GM_B_)
-                            detg_A_=det(GM_A_)
-                            detg_B_=det(GM_B_)
+                            # print('*')
+                            # Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt,div(model.Nt,2),"Backward")
+                            # GM_A_=GroverMatrix(G01[indexA[:],indexA[:]],G02_[indexA[:],indexA[:]])
+                            # gmInv_A_=inv(GM_A_)
+                            # GM_B_=GroverMatrix(G01[indexB[:],indexB[:]],G02_[indexB[:],indexB[:]])
+                            # gmInv_B_=inv(GM_B_)
+                            # detg_A_=det(GM_A_)
+                            # detg_B_=det(GM_B_)
 
-                            for jj in 1:j-1
-                                E=zeros(Ns)
-                                for ii in 1:size(ss[1])[2]
-                                    x,y=model.nnidx[ii,jj]
-                                    E[x]=model.η[ss[2][lt,ii,jj]]
-                                    E[y]=-model.η[ss[2][lt,ii,jj]]
-                                end
-                                Gt2_=model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]' *Gt2_* model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]'
-                                Gt02_=model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]'*Gt02_
-                                G0t2_=G0t2_*model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]'
-                            end
+                            # for jj in 1:j-1
+                            #     E=zeros(Ns)
+                            #     for ii in 1:size(ss[1])[2]
+                            #         x,y=model.nnidx[ii,jj]
+                            #         E[x]=model.η[ss[2][lt,ii,jj]]
+                            #         E[y]=-model.η[ss[2][lt,ii,jj]]
+                            #     end
+                            #     Gt2_=model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]' *Gt2_* model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]'
+                            #     Gt02_=model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]'*Gt02_
+                            #     G0t2_=G0t2_*model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]'
+                            # end
         
-                            if norm(Gt2-Gt2_)+norm(G02-G02_)+norm(Gt02-Gt02_)+norm(G0t2-G0t2_)+
-                               norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>1e-3
-                                println('\n',norm(Gt2-Gt2_),'\n',norm(G02-G02_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t2-G0t2_))
-                                println(norm(gmInv_A_-gmInv_A)," ",norm(gmInv_B-gmInv_B_)," ",abs(detg_A-detg_A_)," ",abs(detg_B-detg_B_))
-                                error("s2:  $lt  $x:,,,asdasdasd")
-                            end
+                            # if norm(Gt2-Gt2_)+norm(G02-G02_)+norm(Gt02-Gt02_)+norm(G0t2-G0t2_)+
+                            #    norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>1e-3
+                            #     println('\n',norm(Gt2-Gt2_),'\n',norm(G02-G02_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t2-G0t2_))
+                            #     println(norm(gmInv_A_-gmInv_A)," ",norm(gmInv_B-gmInv_B_)," ",abs(detg_A-detg_A_)," ",abs(detg_B-detg_B_))
+                            #     error("s2:  $lt  $x:,,,asdasdasd")
+                            # end
                             #####################################################################
 
                         end
