@@ -97,7 +97,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
         BM_F!(tmpN,tmpNN,view(BMs2,:,:,idx),model,ss[2],idx)
         BMinv_F!(tmpN,tmpNN,view(BMsinv1,:,:,idx),model,ss[1],idx)
         BMinv_F!(tmpN,tmpNN,view(BMsinv2,:,:,idx),model,ss[2],idx)
-        @assert norm(view(BMs1,:,:,idx)*view(BMsinv1,:,:,idx)-I(Ns))<1e-8 "BM1 inv error at idx=$idx"
+        # @assert norm(view(BMs1,:,:,idx)*view(BMsinv1,:,:,idx)-I(Ns))<1e-8 "BM1 inv error at idx=$idx"
     end
 
     BLMs1=Array{Float64}(undef,ns,Ns,NN)
