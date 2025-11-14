@@ -21,23 +21,23 @@ function main()
     s=Initial_s(model,rng)
     path="C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/test/"
 
-    s=phy_update(path,model,s,2,true)
+    # s=phy_update(path,model,s,2,true)
 
 
-    # # Half
-    # indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
-    # # println(indexA)
+    # Half
+    indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
+    # println(indexA)
 
-    # # HalfHalf
-    # indexB=area_index(Lattice,site,([1,1],[div(L,3),div(2*L,3)]))
-    # # println(indexB)
+    # HalfHalf
+    indexB=area_index(Lattice,site,([1,1],[div(L,3),div(2*L,3)]))
+    # println(indexB)
 
-    # ss=[s[:,:,:],s[:,:,:]]
-    # λ=0.5
-    # Nλ=2
-    # Sweeps=10
+    ss=[s[:,:,:],s[:,:,:]]
+    λ=0.5
+    Nλ=2
+    Sweeps=10
 
-    # ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
+    ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
 end
 
 main()
