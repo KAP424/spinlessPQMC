@@ -290,7 +290,6 @@ function phy_measure(tmpN,tmpNN,model,G,lt,s)
     #####################################################################
     mul!(tmpNN,model.HalfeK,G0)
     mul!(G0,tmpNN,model.HalfeKinv)
-    # G0=model.HalfeK* G0 *model.HalfeKinv
 
     Ek=model.t*sum(model.K.*G0)
     Ev=0.0
