@@ -151,15 +151,13 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
         for lt in 1:model.Nt
             #####################################################################
             # # println("\n WrapTime check at lt=$lt")
-            # if lt-1 != div(model.Nt,2)
-            #     Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt-1,div(model.Nt,2))
-            #     Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt-1,div(model.Nt,2))
-                    
-            #     if norm(Gt1-Gt1_)+norm(Gt2-Gt2_)+norm(Gt01-Gt01_)+norm(Gt02-Gt02_)+norm(G0t1-G0t1_)+norm(G0t2-G0t2_)>1e-3
-            #         println( norm(Gt1-Gt1_),' ',norm(Gt2-Gt2_),'\n',norm(G01-G01_),' ',norm(G02-G02_),'\n',norm(Gt01-Gt01_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t1-G0t1_),'\n',norm(G0t2-G0t2_) )
-            #         error("$lt : WrapTime")
-            #     end
-            # end
+            Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt-1,div(model.Nt,2),"Forward")
+            Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt-1,div(model.Nt,2),"Forward")
+                
+            if norm(Gt1-Gt1_)+norm(Gt2-Gt2_)+norm(Gt01-Gt01_)+norm(Gt02-Gt02_)+norm(G0t1-G0t1_)+norm(G0t2-G0t2_)>1e-3
+                println( norm(Gt1-Gt1_),' ',norm(Gt2-Gt2_),'\n',norm(G01-G01_),' ',norm(G02-G02_),'\n',norm(Gt01-Gt01_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t1-G0t1_),'\n',norm(G0t2-G0t2_) )
+                error("$lt : WrapTime")
+            end
             #####################################################################
 
             WrapK!(tmpNN,Gt1,Gt01,G0t1,model.eK,model.eKinv)
@@ -210,11 +208,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                             ss[1][lt,i,j]=sx
                             #####################################################################
                             print('-')
-                            if lt==div(model.Nt,2)+1
-                                Gt1_,G01_,G0t1_,Gt01_=G4(model,ss[1],lt-1,div(model.Nt,2))
-                            else
-                                Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt-1,div(model.Nt,2))
-                            end
+                            Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt-1,div(model.Nt,2),"Forward")
                             Gt1_=model.eK*Gt1_*model.eKinv
                             Gt01_=model.eK*Gt01_
                             G0t1_=G0t1_*model.eKinv
@@ -266,12 +260,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
         
                             ss[2][lt,i,j]=sx
                             #####################################################################
-                            print('*')
-                            if lt==div(model.Nt,2)+1
-                                Gt2_,G02_,G0t2_,Gt02_=G4(model,ss[2],lt-1,div(model.Nt,2))
-                            else
-                                Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt-1,div(model.Nt,2))
-                            end
+                            Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt-1,div(model.Nt,2),"Forward")
                             Gt2_=model.eK*Gt2_*model.eKinv
                             Gt02_=model.eK*Gt02_
                             G0t2_=G0t2_*model.eKinv
@@ -363,14 +352,12 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
         for lt in model.Nt:-1:1
             
             #####################################################################
-            if lt-1 != div(model.Nt,2)
-                Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt,div(model.Nt,2))
-                Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt,div(model.Nt,2))
-                    
-                if norm(Gt1-Gt1_)+norm(Gt2-Gt2_)+norm(Gt01-Gt01_)+norm(Gt02-Gt02_)+norm(G0t1-G0t1_)+norm(G0t2-G0t2_)>1e-3
-                    println( norm(Gt1-Gt1_),'\n',norm(Gt2-Gt2_),'\n',norm(Gt01-Gt01_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t1-G0t1_),'\n',norm(G0t2-G0t2_) )
-                    error("$lt : WrapTime")
-                end
+            Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt,div(model.Nt,2),"Backward")
+            Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt,div(model.Nt,2),"Backward")
+                
+            if norm(Gt1-Gt1_)+norm(Gt2-Gt2_)+norm(Gt01-Gt01_)+norm(Gt02-Gt02_)+norm(G0t1-G0t1_)+norm(G0t2-G0t2_)>1e-3
+                println( norm(Gt1-Gt1_),'\n',norm(Gt2-Gt2_),'\n',norm(Gt01-Gt01_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t1-G0t1_),'\n',norm(G0t2-G0t2_) )
+                error("$lt : WrapTime")
             end
             #####################################################################
 
@@ -400,7 +387,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                             ss[1][lt,i,j]=sx
                             #####################################################################
                             print('-')
-                            Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt,div(model.Nt,2))
+                            Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt,div(model.Nt,2),"Backward")
                             
                             GM_A_=GroverMatrix(G01_[indexA[:],indexA[:]],G02[indexA[:],indexA[:]])
                             gmInv_A_=inv(GM_A_)
@@ -451,7 +438,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                             ss[2][lt,i,j]=sx
                             #####################################################################
                             print('*')
-                            Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt,div(model.Nt,2))
+                            Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt,div(model.Nt,2),"Backward")
                             GM_A_=GroverMatrix(G01[indexA[:],indexA[:]],G02_[indexA[:],indexA[:]])
                             gmInv_A_=inv(GM_A_)
                             GM_B_=GroverMatrix(G01[indexB[:],indexB[:]],G02_[indexB[:],indexB[:]])

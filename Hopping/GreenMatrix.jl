@@ -216,7 +216,7 @@ end
 
 
 "displaced Green function G(τ₁,τ₂)"
-function G4(model::_Hubbard_Para,s::Array{UInt8,3},τ1::Int64,τ2::Int64)
+function G4(model::_Hubbard_Para,s::Array{UInt8,3},τ1::Int64,τ2::Int64,direction="Forward")
     if τ1>τ2
         BBs=zeros(Float64,cld(τ1-τ2,model.BatchSize),model.Ns,model.Ns)
         BBsInv=zeros(Float64,size(BBs))
@@ -342,10 +342,12 @@ function G4(model::_Hubbard_Para,s::Array{UInt8,3},τ1::Int64,τ2::Int64)
         return G1,G2,G12,G21
     else
         G=Gτ(model,s,τ1)
-        return G,G,-(I(model.Ns)-G),G
-    
+        if direction=="Forward"
+            return G,G,G,-(I(model.Ns)-G)
+        elseif direction=="Backward"
+            return G,G,-(I(model.Ns)-G),G
+        end
     end
-
 end
 
 
