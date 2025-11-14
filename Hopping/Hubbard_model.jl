@@ -91,7 +91,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
         # 交错化学势，打开gap，去兼并
         μ=1e-3
         if occursin("HoneyComb", Lattice)
-            KK+=μ*(rand()-0.5)*Diagonal(repeat([-1, 1], div(Ns, 2)))
+            KK+=μ*Diagonal(repeat([-1, 1], div(Ns, 2)))
         elseif Lattice=="SQUARE"
             for i in 1:Ns
                 x,y=i_xy(Lattice,site,i)
@@ -123,7 +123,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
         end
     end
 
-    Pt=HalfeKinv*Pt
+    # Pt=HalfeKinv*Pt
 
     a,b=size(nnidx)
     s=ones(Int8,Nt,a,b)
