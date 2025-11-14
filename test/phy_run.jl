@@ -17,7 +17,7 @@ path="C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/test/"
 
 println("Threads: ",Threads.nthreads())
 
-model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"H0")
+model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"V")
 
 print(Threads.nthreads())
 
