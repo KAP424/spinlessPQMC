@@ -3,6 +3,7 @@
 
 function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},indexB::Vector{Int64},Sweeps::Int64,λ::Float64,Nλ::Int64,ss::Vector{Array{UInt8,3}},record)
     global LOCK=ReentrantLock()
+    ERROR=1e-6
     Ns=model.Ns
     ns=div(Ns, 2)
     NN=length(model.nodes)
@@ -65,6 +66,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
     tmpN_ = Vector{Float64}(undef, Ns)
     tmpNN = Matrix{Float64}(undef, Ns, Ns)
     tmpNN2 = Matrix{Float64}(undef, Ns, Ns)
+    # WrapErr = Matrix{Float64}(undef, Ns, Ns)
     tmpNn = Matrix{Float64}(undef, Ns, ns)
     tmpnN = Matrix{Float64}(undef, ns, Ns)
     tmpnn = Matrix{Float64}(undef, ns, ns)
@@ -150,12 +152,12 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
         # println("\n ====== Sweep $loop / $Sweeps ======")
         for lt in 1:model.Nt
             #####################################################################
-            # # # println("\n WrapTime check at lt=$lt")
+            # println("\n WrapTime check at lt=$lt")
             # Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt-1,div(model.Nt,2),"Forward")
             # Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt-1,div(model.Nt,2),"Forward")
                 
-            # if norm(Gt1-Gt1_)+norm(Gt2-Gt2_)+norm(Gt01-Gt01_)+norm(Gt02-Gt02_)+norm(G0t1-G0t1_)+norm(G0t2-G0t2_)>1e-3
-            #     println( norm(Gt1-Gt1_),' ',norm(Gt2-Gt2_),'\n',norm(G01-G01_),' ',norm(G02-G02_),'\n',norm(Gt01-Gt01_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t1-G0t1_),'\n',norm(G0t2-G0t2_) )
+            # if norm(Gt1-Gt1_)+norm(Gt2-Gt2_)+norm(Gt01-Gt01_)+norm(Gt02-Gt02_)+norm(G0t1-G0t1_)+norm(G0t2-G0t2_)>ERROR
+            #     println( norm(Gt1-Gt1_),' ',norm(Gt2-Gt2_),'\n',norm(G01-G01_),' ',norm(G02-G02_),'\n',norm(Gt01-Gt01_),' ',norm(Gt02-Gt02_),'\n',norm(G0t1-G0t1_),' ',norm(G0t2-G0t2_) )
             #     error("$lt : WrapTime")
             # end
             #####################################################################
@@ -219,7 +221,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                             # detg_A_=det(GM_A_)
                             # detg_B_=det(GM_B_)
 
-                            # for jj in size(ss[1])[3]:-1:j
+                            # for jj in 3:-1:j
                             #     E=zeros(Ns)
                             #     for ii in 1:size(ss[1])[2]
                             #         x,y=model.nnidx[ii,jj]
@@ -232,7 +234,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                             # end
         
                             # if norm(Gt1-Gt1_)+norm(G01-G01_)+norm(Gt01-Gt01_)+norm(G0t1-G0t1_)+
-                            #    norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>1e-3
+                            #    norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>ERROR
                             #     println('\n',norm(Gt1-Gt1_),'\n',norm(G01-G01_),'\n',norm(Gt01-Gt01_),'\n',norm(G0t1-G0t1_))
                             #     println(norm(gmInv_A_-gmInv_A)," ",norm(gmInv_B-gmInv_B_)," ",abs(detg_A-detg_A_)," ",abs(detg_B-detg_B_))
                             #     error("s1:  $lt  $j:,,,asdasdasd")
@@ -260,6 +262,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
         
                             ss[2][lt,i,j]=sx
                             #####################################################################
+                            # print('*')
                             # Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt-1,div(model.Nt,2),"Forward")
                             # Gt2_=model.eK*Gt2_*model.eKinv
                             # Gt02_=model.eK*Gt02_
@@ -284,7 +287,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                             # end
         
                             # if norm(Gt2-Gt2_)+norm(G02-G02_)+norm(Gt02-Gt02_)+norm(G0t2-G0t2_)+
-                            #    norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>1e-3
+                            #    norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>ERROR
                             #     println('\n',norm(Gt2-Gt2_),'\n',norm(G02-G02_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t2-G0t2_))
                             #     println(norm(gmInv_A_-gmInv_A)," ",norm(gmInv_B-gmInv_B_)," ",abs(detg_A-detg_A_)," ",abs(detg_B-detg_B_))
                             #     error("s2:  $lt  $x:,,,asdasdasd")
@@ -303,7 +306,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
             counter+=1
             ##------------------------------------------------------------------------
             
-            if  any(model.nodes .== lt) 
+            if  any(model.nodes .== lt)
                 idx+=1
                 BM_F!(tmpN,tmpNN,view(BMs1,:,:,idx-1),model,ss[1],idx-1)
                 BMinv_F!(tmpN,tmpNN,view(BMsinv1,:,:,idx-1),model,ss[1],idx-1)
@@ -334,8 +337,40 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                     LAPACK.orgrq!(tmpnN, tau, ns)
                     copyto!(view(BLMs2,:,:,i) , tmpnN)
                 end
+                
+                #####################################################################
+                # if lt != div(model.Nt,2)
+                #     copyto!(WrapErr, Gt1)
+                #     axpy!(1.0, Gt2, WrapErr)
+                #     axpy!(1.0, G01, WrapErr)
+                #     axpy!(1.0, G02, WrapErr)
+                #     axpy!(1.0, Gt01, WrapErr)
+                #     axpy!(1.0, Gt02, WrapErr)
+                #     axpy!(1.0, G0t1, WrapErr)
+                #     axpy!(1.0, G0t2, WrapErr)
+                # end
+                #####################################################################
+                
                 G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,idx,BLMs1,BRMs1,BMs1,BMsinv1,"Forward")
                 G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,idx,BLMs2,BRMs2,BMs2,BMsinv2,"Forward")
+                
+                #####################################################################
+                # if lt != div(model.Nt,2)
+                #     axpy!(-1.0, Gt1, WrapErr)
+                #     axpy!(-1.0, Gt2, WrapErr)
+                #     axpy!(-1.0, G01, WrapErr)
+                #     axpy!(-1.0, G02, WrapErr)
+                #     axpy!(-1.0, Gt01, WrapErr)
+                #     axpy!(-1.0, Gt02, WrapErr)
+                #     axpy!(-1.0, G0t1, WrapErr)
+                #     axpy!(-1.0, G0t2, WrapErr)
+                #     tmp=norm(WrapErr)
+                #     if tmp>ERROR
+                #         println("Forward WrapTime error for at lt=$lt : $tmp")
+                #     end
+                # end
+                #####################################################################
+                
                 GroverMatrix!(gmInv_A,view(G01,indexA,indexA),view(G02,indexA,indexA))
                 detg_A=abs(det(gmInv_A))
                 LAPACK.getrf!(gmInv_A,ipivA)
@@ -355,7 +390,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
             # Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt,div(model.Nt,2),"Backward")
             # Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt,div(model.Nt,2),"Backward")
                 
-            # if norm(Gt1-Gt1_)+norm(Gt2-Gt2_)+norm(Gt01-Gt01_)+norm(Gt02-Gt02_)+norm(G0t1-G0t1_)+norm(G0t2-G0t2_)>1e-3
+            # if norm(Gt1-Gt1_)+norm(Gt2-Gt2_)+norm(Gt01-Gt01_)+norm(Gt02-Gt02_)+norm(G0t1-G0t1_)+norm(G0t2-G0t2_)>ERROR
             #     println( norm(Gt1-Gt1_),'\n',norm(Gt2-Gt2_),'\n',norm(Gt01-Gt01_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t1-G0t1_),'\n',norm(G0t2-G0t2_) )
             #     error("$lt : WrapTime")
             # end
@@ -409,7 +444,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                             # end
         
                             # if norm(Gt1-Gt1_)+norm(G01-G01_)+norm(Gt01-Gt01_)+norm(G0t1-G0t1_)+
-                            #    norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>1e-3
+                            #    norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>ERROR
                             #     println('\n',norm(Gt1-Gt1_),'\n',norm(G01-G01_),'\n',norm(Gt01-Gt01_),'\n',norm(G0t1-G0t1_))
                             #     println(norm(gmInv_A_-gmInv_A)," ",norm(gmInv_B-gmInv_B_)," ",abs(detg_A-detg_A_)," ",abs(detg_B-detg_B_))
                             #     error("s1:  $lt  $j:,,,asdasdasd")
@@ -459,7 +494,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                             # end
         
                             # if norm(Gt2-Gt2_)+norm(G02-G02_)+norm(Gt02-Gt02_)+norm(G0t2-G0t2_)+
-                            #    norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>1e-3
+                            #    norm(gmInv_A_-gmInv_A)+norm(gmInv_B-gmInv_B_)+abs(detg_A-detg_A_)+abs(detg_B-detg_B_)>ERROR
                             #     println('\n',norm(Gt2-Gt2_),'\n',norm(G02-G02_),'\n',norm(Gt02-Gt02_),'\n',norm(G0t2-G0t2_))
                             #     println(norm(gmInv_A_-gmInv_A)," ",norm(gmInv_B-gmInv_B_)," ",abs(detg_A-detg_A_)," ",abs(detg_B-detg_B_))
                             #     error("s2:  $lt  $x:,,,asdasdasd")
@@ -491,6 +526,9 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                 WrapV!(tmpNN,G0t2,tmpN_,view(model.UV,:,:,j),2)
 
             end
+
+            WrapK!(tmpNN,Gt1,Gt01,G0t1,model.eKinv,model.eK)
+            WrapK!(tmpNN,Gt2,Gt02,G0t2,model.eKinv,model.eK)
 
             ##------------------------------------------------------------------------
             tmpO+=(detg_A/detg_B)^(1/Nλ)
@@ -526,8 +564,40 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                     LAPACK.orgqr!(tmpNn, tau, ns)
                     copyto!(view(BRMs2,:,:,i) , tmpNn)
                 end
+
+                #####################################################################
+                # if lt-1 != div(model.Nt,2)
+                #     copyto!(WrapErr, Gt1)
+                #     axpy!(1.0, Gt2, WrapErr)
+                #     axpy!(1.0, G01, WrapErr)
+                #     axpy!(1.0, G02, WrapErr)
+                #     axpy!(1.0, Gt01, WrapErr)
+                #     axpy!(1.0, Gt02, WrapErr)
+                #     axpy!(1.0, G0t1, WrapErr)
+                #     axpy!(1.0, G0t2, WrapErr)
+                # end
+                #####################################################################
+
                 G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,idx,BLMs1,BRMs1,BMs1,BMsinv1,"Backward")
                 G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,idx,BLMs2,BRMs2,BMs2,BMsinv2,"Backward")
+                
+                #####################################################################
+                # if lt-1 != div(model.Nt,2)
+                #     axpy!(-1.0, Gt1, WrapErr)
+                #     axpy!(-1.0, Gt2, WrapErr)
+                #     axpy!(-1.0, G01, WrapErr)
+                #     axpy!(-1.0, G02, WrapErr)
+                #     axpy!(-1.0, Gt01, WrapErr)
+                #     axpy!(-1.0, Gt02, WrapErr)
+                #     axpy!(-1.0, G0t1, WrapErr)
+                #     axpy!(-1.0, G0t2, WrapErr)
+                #     tmp=norm(WrapErr)
+                #     if tmp>ERROR
+                #         println("Backward WrapTime error for at lt=$(lt-1) : $tmp")
+                #     end
+                # end
+                #####################################################################
+                
                 GroverMatrix!(gmInv_A,view(G01,indexA,indexA),view(G02,indexA,indexA))
                 detg_A=abs(det(gmInv_A))
                 LAPACK.getrf!(gmInv_A,ipivA)
@@ -536,9 +606,6 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                 detg_B=abs(det(gmInv_B))
                 LAPACK.getrf!(gmInv_B,ipivB)
                 LAPACK.getri!(gmInv_B, ipivB)
-            else
-                WrapK!(tmpNN,Gt1,Gt01,G0t1,model.eKinv,model.eK)
-                WrapK!(tmpNN,Gt2,Gt02,G0t2,model.eKinv,model.eK)
             end
         end
 
@@ -563,9 +630,9 @@ function G4update!(tmpNN::Matrix{Float64},tmp2N::Matrix{Float64},subidx::Vector{
 
     mul!(tmp2N,r,view(Gt0,subidx,:))   # useful for GΘ,GτΘ
     mul!(tmpNN, view(G0t,:,subidx),tmp2N)
-    axpy!(1, tmpNN, G0)
+    axpy!(1.0, tmpNN, G0)
     mul!(tmpNN, view(Gt,:,subidx),tmp2N)
-    axpy!(1, tmpNN, Gt0)
+    axpy!(1.0, tmpNN, Gt0)
 
     mul!(tmp2N,r,view(Gt,subidx,:))
     lmul!(-1.0,tmp2N)

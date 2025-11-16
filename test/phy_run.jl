@@ -6,11 +6,11 @@ using Random
 
 
 t=1;   Lattice="HoneyComb60"    
-U=1;     Δt=0.05;     Θ=10.0;
+U=1;     Δt=0.05;     Θ=4.0;
 BatchSize=5;
   
 
-L=6
+L=3
 site=[L,L]
 
 path="C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/test/"

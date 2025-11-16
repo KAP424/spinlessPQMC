@@ -280,8 +280,8 @@ function G4(model::_Hubbard_Para,s::Array{UInt8,3},τ1::Int64,τ2::Int64,directi
                     E=zeros(model.Ns)
                     for i in 1:size(s)[2]
                         x,y=model.nnidx[i,j]
-                        E[x]=s[τ2+(lt-1)*model.BatchSize+lt2,i,j]
-                        E[y]=-s[τ2+(lt-1)*model.BatchSize+lt2,i,j]
+                        E[x]=model.η[s[τ2+(lt-1)*model.BatchSize+lt2,i,j]]
+                        E[y]=-model.η[s[τ2+(lt-1)*model.BatchSize+lt2,i,j]]
                     end
                     BBs[lt,:,:]=model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'*BBs[lt,:,:]
                     BBsInv[lt,:,:]=BBsInv[lt,:,:]*model.UV[:,:,j]*Diagonal(exp.(-model.α.*E))*model.UV[:,:,j]'

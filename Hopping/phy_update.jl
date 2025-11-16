@@ -41,7 +41,6 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{UInt8,3},Sweeps::
     tmpNn = Matrix{Float64}(undef, Ns, ns)
     tmpnn = Matrix{Float64}(undef, ns, ns)
     tmpnN = Matrix{Float64}(undef, ns, Ns)
-
     tmp2N = Matrix{Float64}(undef, 2, Ns)
     tmp22 = Matrix{Float64}(undef, 2,2)
     tmp2 = Vector{Float64}(undef,2)
@@ -152,12 +151,12 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{UInt8,3},Sweeps::
 
                 get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,idx), view(BRs,:,:,idx),G)
 
-                #####################################################################
-                # axpy!(-1.0, G, tmpNN)  
-                # if norm(tmpNN)>1e-8
-                #     println("Warning for Batchsize Wrap Error : $(norm(tmpNN))")
-                # end
-                #####################################################################
+                #------------------------------------------------------------------#
+                axpy!(-1.0, G, tmpNN)  
+                if norm(tmpNN)>1e-7
+                    println("Warning for Batchsize Wrap Error : $(norm(tmpNN))")
+                end
+                #------------------------------------------------------------------#
 
             end
 
@@ -214,7 +213,16 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{UInt8,3},Sweeps::
                 copyto!(view(BLs,:,:,idx) , tmpnN)
                 # BL .= Matrix(qr(( BL * BM )').Q)'
 
+                copyto!(tmpNN , G)
+
                 get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,idx), view(BRs,:,:,idx),G)
+
+                #------------------------------------------------------------------#
+                axpy!(-1.0, G, tmpNN)  
+                if norm(tmpNN)>1e-7
+                    println("Warning for Batchsize Wrap Error : $(norm(tmpNN))")
+                end
+                #------------------------------------------------------------------#
             end
         end
 
