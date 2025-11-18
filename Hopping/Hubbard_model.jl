@@ -1,7 +1,15 @@
 # using density channel ±1,±2 HS transformation
 
-# mutable
-struct _Hubbard_Para
+
+mutable struct UpdateBuffer_
+	uv::Matrix{Float64}      # 2 x 2
+	tmp22::Matrix{Float64}   # 2 x 2
+	tmp2::Vector{Float64}    # length 2
+	r::Matrix{Float64}       # 2 x 2
+	Δ::Matrix{Float64}       # 2 x 2
+    subidx::Vector{Int64}  # length 2
+end
+struct Hubbard_Para_
     Lattice::String
     t::Float64
     U::Float64
@@ -11,9 +19,7 @@ struct _Hubbard_Para
     Nt::Int64
     K::Array{Float64,2}
     BatchSize::Int64
-    WrapTime::Int64
     Δt::Float64
-    α::Float64
     γ::Vector{Float64}
     η::Vector{Float64}
     Pt::Array{Float64,2}
@@ -22,61 +28,15 @@ struct _Hubbard_Para
     HalfeKinv::Array{Float64,2}
     eKinv::Array{Float64,2}
     nnidx::Matrix{Tuple{Int64, Int64}}
-    UV::Array{Float64, 3}
     nodes::Vector{Int64}
+    UV::Array{Float64, 3}
+    samplers_dict::Dict{UInt8, Random.Sampler}
 end
 
 
 function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
-    Nt::Int64=2*cld(Θ,Δt)
-    WrapTime::Int64=div(BatchSize,2)
-    
-    α = sqrt(Δt * U / 2)
-    γ = [1 + sqrt(6) / 3, 1 + sqrt(6) / 3, 1 - sqrt(6) / 3, 1 - sqrt(6) / 3]
-    η = [sqrt(2 * (3 - sqrt(6))), -sqrt(2 * (3 - sqrt(6))), sqrt(2 * (3 + sqrt(6))), -sqrt(2 * (3 + sqrt(6)))]
-    
     K=K_Matrix(Lattice,site)
-    Ns=size(K)[1]
-    if Lattice=="SQUARE"
-        Ns=prod(site)
-        if length(site)==1
-            nnidx=fill((0, 0), div(Ns,2), 2)
-            count=1
-            for i in 1:2:Ns
-                nn=nn2idx(Lattice,site,i)
-                for j in eachindex(nn)
-                    nnidx[count,j]=(i,nn[j])
-                end
-                count+=1
-            end
-        elseif length(site)==2
-            nnidx=fill((0, 0), div(Ns,2), 4)
-            count=1
-            for x in 1:site[1]
-                for y in 1:site[2]
-                    if (x+y)%2==1
-                        i=x+(y-1)*site[1]
-                        nn=nn2idx(Lattice,site,i)
-                        for j in eachindex(nn)
-                            nnidx[count,j]=(i,nn[j])
-                        end
-                        count+=1
-                    end
-                end
-            end
-        end
-    elseif  occursin("HoneyComb", Lattice)
-        Ns=prod(site)*2
-        nnidx=fill((0, 0), div(Ns,2), 3)
-        count=1
-        for i in 1:2:Ns
-            nn=nn2idx(Lattice,site,i)
-            for j in eachindex(nn)
-                nnidx[count,j]=(i,nn[j])
-            end
-            count+=1
-        end
-    end
+    Ns=size(K,1)
 
     E,V=LAPACK.syevd!('V', 'L',-t.*K[:,:])
     HalfeK=V*Diagonal(exp.(-Δt.*E./2))*V'
@@ -84,8 +44,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     HalfeKinv=V*Diagonal(exp.(Δt.*E./2))*V'
     eKinv=V*Diagonal(exp.(Δt.*E))*V'
 
-
-    Pt=zeros(Float64,Ns,Int(Ns/2))
+    Pt=zeros(Float64,Ns,div(Ns,2))
     if Initial=="H0"
         KK=K[:,:]
         # 交错化学势，打开gap，去兼并
@@ -104,7 +63,6 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
         # KK=(KK+KK')./2
         
         E,V=LAPACK.syevd!('V', 'L',KK[:,:])
-        # Pt.=V[:,1:div(Ns,2)]
         Pt.=V[:,div(Ns,2)+1:end]
     elseif Initial=="V" 
         if occursin("HoneyComb", Lattice)
@@ -122,29 +80,173 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
             end
         end
     end
-
     Pt=HalfeKinv*Pt
 
-    a,b=size(nnidx)
-    s=ones(Int8,Nt,a,b)
-    UV=zeros(Float64,Ns,Ns,b)
-    
-    for j in 1:b
-        for i in 1:size(s)[2]
-            x,y=nnidx[i,j]
-            UV[x,x,j]=UV[x,y,j]=UV[y,x,j]=-2^0.5/2
-            UV[y,y,j]=2^0.5/2
-        end
-    end
+    Nt=2*cld(Θ,Δt)
+    α = sqrt(Δt * U / 2)
+    γ = [1 + sqrt(6) / 3, 1 + sqrt(6) / 3, 1 - sqrt(6) / 3, 1 - sqrt(6) / 3]
+    η = [sqrt(2 * (3 - sqrt(6))), -sqrt(2 * (3 - sqrt(6))), sqrt(2 * (3 + sqrt(6))), -sqrt(2 * (3 + sqrt(6)))]
+    η .= η .* α
 
+    nnidx=nnidx_F(Lattice,site)
     if div(Nt, 2) % BatchSize == 0
         nodes = collect(0:BatchSize:Nt)
     else
         nodes = vcat(0, reverse(collect(div(Nt, 2) - BatchSize:-BatchSize:1)), collect(div(Nt, 2):BatchSize:Nt), Nt)
     end
 
-    return _Hubbard_Para(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,WrapTime,Δt,α,γ,η,Pt,HalfeK,eK,HalfeKinv,eKinv,nnidx,UV,nodes)
+    UV=zeros(Float64,Ns,Ns,size(nnidx,2))
+    for j in axes(nnidx,2)
+        for i in axes(nnidx,1)
+            x,y=nnidx[i,j]
+            UV[x,x,j]=UV[x,y,j]=UV[y,x,j]=-2^0.5/2
+            UV[y,y,j]=2^0.5/2
+        end
+    end
 
+    rng=MersenneTwister(Threads.threadid()+time_ns())
+    elements = (1, 2, 3, 4)
+    samplers_dict = Dict{UInt8, Random.Sampler}()
+    for excluded in elements
+        allowed = [i for i in elements if i != excluded]
+        samplers_dict[excluded] = Random.Sampler(rng, allowed)
+    end
+
+    return Hubbard_Para_(Lattice,t,U,site,Θ,Ns,Nt,K,BatchSize,Δt,γ,η,Pt,HalfeK,eK,HalfeKinv,eKinv,nnidx,nodes,UV,samplers_dict)
+
+end
+
+function UpdateBuffer()
+    uv=[-2^0.5/2 -2^0.5/2;-2^0.5/2 2^0.5/2]
+    return UpdateBuffer_(
+        uv,
+        Matrix{Float64}(undef, 2, 2),
+        Vector{Float64}(undef, 2),
+        Matrix{Float64}(undef, 2, 2),
+        Matrix{Float64}(undef, 2, 2),
+        Vector{Int64}(undef, 2),
+    )
+end
+
+
+# ---------------------------------------------------------------------------------------
+# Buffers for phy_update workflow
+mutable struct PhyBuffer_
+	tau::Vector{Float64}
+	ipiv::Vector{LAPACK.BlasInt}
+
+	G::Matrix{Float64}
+	BM::Matrix{Float64}
+	BLs::Array{Float64,3}
+	BRs::Array{Float64,3}
+
+	# generic temporaries
+    N::Vector{Float64}
+	NN::Matrix{Float64}
+	Nn::Matrix{Float64}
+	nn::Matrix{Float64}
+	nN::Matrix{Float64}
+	zN::Matrix{Float64}   # 2 x Ns
+end
+# ---------------------------------------------------------------------------------------
+# Buffers for SCEE workflow
+mutable struct SCEEBuffer_
+    II::Matrix{Float64}                 # Ns x Ns identity matrix (dense)
+    N::Vector{Float64}                 # Ns
+    N_::Vector{Float64}                # Ns
+    nn::Matrix{Float64}             
+    NN::Matrix{Float64}             
+    NN_::Matrix{Float64}            
+    Nn::Matrix{Float64}             
+    nN::Matrix{Float64}             
+    ipiv::Vector{LAPACK.BlasInt}        # length ns
+	tau::Vector{Float64}                # length ns
+end
+
+mutable struct G4Buffer_
+    Gt::Matrix{Float64}
+    G0::Matrix{Float64}
+    Gt0::Matrix{Float64}
+    G0t::Matrix{Float64}
+
+    BLMs::Array{Float64,3}
+    BRMs::Array{Float64,3}
+    BMs::Array{Float64,3}
+    BMinvs::Array{Float64,3}
+end
+
+mutable struct AreaBuffer_
+    gmInv
+    NN::Matrix{Float64}              # nA x nA
+    N2::Matrix{Float64}              # nA x 2
+    zN::Matrix{Float64}              # 2 x nA
+    a::Matrix{Float64}               # nA x 2
+    b::Matrix{Float64}               # 2 x nA
+    Tau::Matrix{Float64}             # 2 x 2
+	ipiv::Vector{LAPACK.BlasInt}        # length ns
+end
+
+function PhyBuffer(Ns,NN)
+    ns = div(Ns,2)
+    return PhyBuffer_(
+        Vector{Float64}(undef, ns),
+        Vector{LAPACK.BlasInt}(undef, ns),
+
+        Matrix{Float64}(undef, Ns, Ns),
+        Matrix{Float64}(undef, Ns, Ns),
+        Array{Float64}(undef, ns, Ns, NN),
+        Array{Float64}(undef, Ns, ns, NN),
+
+        Vector{Float64}(undef, Ns),
+        Matrix{Float64}(undef, Ns, Ns),
+        Matrix{Float64}(undef, Ns, ns),
+        Matrix{Float64}(undef, ns, ns),
+        Matrix{Float64}(undef, ns, Ns),
+        Matrix{Float64}(undef, 2, Ns),
+    )
+end
+
+function SCEEBuffer(Ns,ns)
+    return SCEEBuffer_(
+        Matrix{Float64}(I, Ns, Ns),
+        Vector{Float64}(undef, Ns),
+        Vector{Float64}(undef, Ns),
+        Matrix{Float64}(undef, Ns, Ns),
+        Matrix{Float64}(undef, Ns, Ns),
+        Matrix{Float64}(undef, Ns, Ns),
+        Matrix{Float64}(undef, Ns, ns),
+        Matrix{Float64}(undef, ns, Ns),
+        Vector{LAPACK.BlasInt}(undef, ns),
+        Vector{Float64}(undef, ns),
+    )
+    
+end
+
+function G4Buffer(Ns,ns,NN)
+    return G4Buffer_(
+        Matrix{Float64}(undef, Ns, Ns),
+        Matrix{Float64}(undef, Ns, Ns),
+        Matrix{Float64}(undef, Ns, Ns),
+        Matrix{Float64}(undef, Ns, Ns),
+
+        Array{Float64,3}(undef, ns, Ns, NN),
+        Array{Float64,3}(undef, Ns, ns, NN),
+        Array{Float64,3}(undef, Ns, Ns, NN),
+        Array{Float64,3}(undef, Ns, Ns, NN),
+    )
+end
+
+function AreaBuffer(nA,ns)
+    return AreaBuffer_(
+        nothing,
+        Matrix{Float64}(undef, nA, nA),
+        Matrix{Float64}(undef, nA, 2),
+        Matrix{Float64}(undef, 2, nA),
+        Matrix{Float64}(undef, nA, 2),
+        Matrix{Float64}(undef, 2, nA),
+        Matrix{Float64}(undef, 2, 2),
+        Vector{LAPACK.BlasInt}(undef, ns),
+    )
 end
 
 

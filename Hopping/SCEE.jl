@@ -1,21 +1,38 @@
 # For particle hole symmetric of t-V model
 # attractive-U and repulsive-U get the same S_2
 
-function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},indexB::Vector{Int64},Sweeps::Int64,λ::Float64,Nλ::Int64,ss::Vector{Array{UInt8,3}},record)
+# make_scee_buffer
+# BM_F!
+# BMinv_F!
+# G4!
+# GroverMatrix!
+# G4update!
+# WrapK!
+# WrapV!
+# get_r!
+# get_abTau1!
+# get_abTau2!
+# GMupdate!
+# inv22!
+
+
+function ctrl_SCEEicr(path::String,model::Hubbard_Para_,indexA::Vector{Int64},indexB::Vector{Int64},Sweeps::Int64,λ::Float64,Nλ::Int64,ss::Vector{Array{UInt8,3}},record)
     global LOCK=ReentrantLock()
     ERROR=1e-6
     Ns=model.Ns
     ns=div(Ns, 2)
     NN=length(model.nodes)
-    tau = Vector{Float64}(undef, ns)
-    ipiv = Vector{LAPACK.BlasInt}(undef, ns)
-    ipivA = Vector{LAPACK.BlasInt}(undef, length(indexA))
-    ipivB = Vector{LAPACK.BlasInt}(undef, length(indexB))
-    II=Diagonal(ones(Float64,Ns))
+    # centralize scratch allocations for SCEE
+    sbuf = make_scee_buffer(model, indexA, indexB)
+    tau = sbuf.tau
+    ipiv = sbuf.ipiv
+    ipivA = sbuf.ipivA
+    ipivB = sbuf.ipivB
+    II = sbuf.II
 
     Θidx=div(NN,2)+1
 
-    uv=[-2^0.5/2 -2^0.5/2;-2^0.5/2 2^0.5/2]
+    uv = sbuf.uv
     name = if model.Lattice=="SQUARE" "□" 
     elseif model.Lattice=="HoneyComb60" "HC60" 
     elseif model.Lattice=="HoneyComb120" "HC120" 
@@ -35,12 +52,7 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
     
     
     rng=MersenneTwister(Threads.threadid()+time_ns())
-    elements = (1, 2, 3, 4)
-    samplers_dict = Dict{UInt8, Random.Sampler}()
-    for excluded in elements
-        allowed = [i for i in elements if i != excluded]
-        samplers_dict[excluded] = Random.Sampler(rng, allowed)
-    end
+    samplers_dict = model.samplers_dict
 
     Gt1= Matrix{Float64}(undef ,Ns, Ns)
     Gt2= Matrix{Float64}(undef ,Ns, Ns)
@@ -62,29 +74,28 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
     Tau_B= Matrix{Float64}(undef ,2,2)
 
     # 预分配临时数组
-    tmpN = Vector{Float64}(undef, Ns)
-    tmpN_ = Vector{Float64}(undef, Ns)
-    tmpNN = Matrix{Float64}(undef, Ns, Ns)
-    tmpNN2 = Matrix{Float64}(undef, Ns, Ns)
+    tmpN = sbuf.tmpN
+    tmpN_ = sbuf.tmpN_
+    tmpNN = sbuf.tmpNN
+    tmpNN_ = sbuf.tmpNN_
     # WrapErr = Matrix{Float64}(undef, Ns, Ns)
-    tmpNn = Matrix{Float64}(undef, Ns, ns)
-    tmpnN = Matrix{Float64}(undef, ns, Ns)
-    tmpnn = Matrix{Float64}(undef, ns, ns)
+    tmpNn = sbuf.tmpNn
+    tmpnN = sbuf.tmpnN
+    tmpnn = sbuf.tmpnn
+    tmpAA = Matrix{Float64}(undef ,length(indexA),length(indexA))
     tmpAA = Matrix{Float64}(undef ,length(indexA),length(indexA))
     tmpBB = Matrix{Float64}(undef ,length(indexB),length(indexB))
 
-    tmp2N = Matrix{Float64}(undef, 2, Ns)
-    tmp2A= Matrix{Float64}(undef ,2,length(indexA))
-    tmp2B= Matrix{Float64}(undef ,2,length(indexB))
-    tmpA2= Matrix{Float64}(undef ,length(indexA),2)
-    tmpB2= Matrix{Float64}(undef ,length(indexB),2)
-    tmp22 = Matrix{Float64}(undef, 2,2)
-    tmp2 = Vector{Float64}(undef,2)
+    tmp2N = sbuf.tmp2N
+    tmp2A = sbuf.tmp2A
+    tmp2B = sbuf.tmp2B
+    tmpA2 = sbuf.tmpA2
+    tmpB2 = sbuf.tmpB2
+    tmp22 = sbuf.tmp22
+    tmp2 = sbuf.tmp2
 
-    r = Matrix{Float64}(undef, 2,2)
-    Δ = Matrix{Float64}(undef, 2,2)
-
-    tmpO=0.0
+    r = sbuf.r
+    Δ = sbuf.Δ
     counter=0
     O=zeros(Float64,Sweeps+1)
     O[1]=λ
@@ -137,8 +148,8 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
 
     end
 
-    G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,1,BLMs1,BRMs1,BMs1,BMsinv1)
-    G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,1,BLMs2,BRMs2,BMs2,BMsinv2)
+    G4!(II,tmpnn,tmpNn,tmpNN,tmpNN_,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,1,BLMs1,BRMs1,BMs1,BMsinv1)
+    G4!(II,tmpnn,tmpNn,tmpNN,tmpNN_,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,1,BLMs2,BRMs2,BMs2,BMsinv2)
     GroverMatrix!(gmInv_A,view(G01,indexA,indexA),view(G02,indexA,indexA))
     detg_A=abs(det(gmInv_A))
     LAPACK.getrf!(gmInv_A,ipivA)
@@ -195,16 +206,16 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                         sx = rand(rng,  samplers_dict[ss[1][lt,i,j]])
                         p=get_r!(uv,tmp2,Δ,tmp22,r,model.α,model.η[sx]-model.η[ss[1][lt,i,j]],subidx,Gt1)
 
-                        detTau_A=get_abTau1!(tmpAA,tmp2A,a_A,b_A,Tau_A,indexA,subidx,r,G02,Gt01,G0t1,gmInv_A)
-                        detTau_B=get_abTau1!(tmpBB,tmp2B,a_B,b_B,Tau_B,indexB,subidx,r,G02,Gt01,G0t1,gmInv_B)
+                        detTau_A=get_abTau1!(sbuf,a_A,b_A,Tau_A,indexA,subidx,r,G02,Gt01,G0t1,gmInv_A)
+                        detTau_B=get_abTau1!(sbuf,a_B,b_B,Tau_B,indexB,subidx,r,G02,Gt01,G0t1,gmInv_B)
 
                         @fastmath p*= (detTau_A)^λ * (detTau_B)^(1-λ)
                         if rand(rng)<p
                             detg_A*=detTau_A
                             detg_B*=detTau_B
         
-                            GMupdate!(tmpA2,tmp2A,tmp22,tmpAA,a_A,b_A,Tau_A,gmInv_A)
-                            GMupdate!(tmpB2,tmp2B,tmp22,tmpBB,a_B,b_B,Tau_B,gmInv_B)
+                            GMupdate!(sbuf,a_A,b_A,Tau_A,gmInv_A)
+                            GMupdate!(sbuf,a_B,b_B,Tau_B,gmInv_B)
                             G4update!(tmpNN,tmp2N,subidx,r,Gt1,G01,Gt01,G0t1)
 
                             ss[1][lt,i,j]=sx
@@ -248,16 +259,16 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                         sx = rand(rng,  samplers_dict[ss[2][lt,i,j]])
                         p=get_r!(uv,tmp2,Δ,tmp22,r,model.α,model.η[sx]-model.η[ss[2][lt,i,j]],subidx,Gt2)
 
-                        detTau_A=get_abTau2!(tmpAA,tmp2A,a_A,b_A,Tau_A,indexA,subidx,r,G01,Gt02,G0t2,gmInv_A)
-                        detTau_B=get_abTau2!(tmpBB,tmp2B,a_B,b_B,Tau_B,indexB,subidx,r,G01,Gt02,G0t2,gmInv_B)
+                        detTau_A=get_abTau2!(sbuf,a_A,b_A,Tau_A,indexA,subidx,r,G01,Gt02,G0t2,gmInv_A)
+                        detTau_B=get_abTau2!(sbuf,a_B,b_B,Tau_B,indexB,subidx,r,G01,Gt02,G0t2,gmInv_B)
 
                         @fastmath p*= (detTau_A)^λ * (detTau_B)^(1-λ)
                         if rand(rng)<p
                             detg_A*=detTau_A
                             detg_B*=detTau_B
         
-                            GMupdate!(tmpA2,tmp2A,tmp22,tmpAA,a_A,b_A,Tau_A,gmInv_A)
-                            GMupdate!(tmpB2,tmp2B,tmp22,tmpBB,a_B,b_B,Tau_B,gmInv_B)
+                            GMupdate!(sbuf,a_A,b_A,Tau_A,gmInv_A)
+                            GMupdate!(sbuf,a_B,b_B,Tau_B,gmInv_B)
                             G4update!(tmpNN,tmp2N,subidx,r,Gt2,G02,Gt02,G0t2)
         
                             ss[2][lt,i,j]=sx
@@ -351,8 +362,8 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                 # end
                 #####################################################################
                 
-                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,idx,BLMs1,BRMs1,BMs1,BMsinv1,"Forward")
-                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,idx,BLMs2,BRMs2,BMs2,BMsinv2,"Forward")
+                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN_,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,idx,BLMs1,BRMs1,BMs1,BMsinv1,"Forward")
+                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN_,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,idx,BLMs2,BRMs2,BMs2,BMsinv2,"Forward")
                 
                 #####################################################################
                 # if lt != div(model.Nt,2)
@@ -407,16 +418,16 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                         sx = rand(rng,  samplers_dict[ss[1][lt,i,j]])
                         p=get_r!(uv,tmp2,Δ,tmp22,r,model.α,model.η[sx]-model.η[ss[1][lt,i,j]],subidx,Gt1)
 
-                        detTau_A=get_abTau1!(tmpAA,tmp2A,a_A,b_A,Tau_A,indexA,subidx,r,G02,Gt01,G0t1,gmInv_A)
-                        detTau_B=get_abTau1!(tmpBB,tmp2B,a_B,b_B,Tau_B,indexB,subidx,r,G02,Gt01,G0t1,gmInv_B)
+                        detTau_A=get_abTau1!(sbuf,a_A,b_A,Tau_A,indexA,subidx,r,G02,Gt01,G0t1,gmInv_A)
+                        detTau_B=get_abTau1!(sbuf,a_B,b_B,Tau_B,indexB,subidx,r,G02,Gt01,G0t1,gmInv_B)
 
                         @fastmath p*= (detTau_A)^λ * (detTau_B)^(1-λ)
                         if rand(rng)<p
                             detg_A*=detTau_A
                             detg_B*=detTau_B
         
-                            GMupdate!(tmpA2,tmp2A,tmp22,tmpAA,a_A,b_A,Tau_A,gmInv_A)
-                            GMupdate!(tmpB2,tmp2B,tmp22,tmpBB,a_B,b_B,Tau_B,gmInv_B)
+                            GMupdate!(sbuf,a_A,b_A,Tau_A,gmInv_A)
+                            GMupdate!(sbuf,a_B,b_B,Tau_B,gmInv_B)
                             G4update!(tmpNN,tmp2N,subidx,r,Gt1,G01,Gt01,G0t1)
 
                             ss[1][lt,i,j]=sx
@@ -458,16 +469,16 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                         sx = rand(rng,  samplers_dict[ss[2][lt,i,j]])
                         p=get_r!(uv,tmp2,Δ,tmp22,r,model.α,model.η[sx]-model.η[ss[2][lt,i,j]],subidx,Gt2)
 
-                        detTau_A=get_abTau2!(tmpAA,tmp2A,a_A,b_A,Tau_A,indexA,subidx,r,G01,Gt02,G0t2,gmInv_A)
-                        detTau_B=get_abTau2!(tmpBB,tmp2B,a_B,b_B,Tau_B,indexB,subidx,r,G01,Gt02,G0t2,gmInv_B)
+                        detTau_A=get_abTau2!(sbuf,a_A,b_A,Tau_A,indexA,subidx,r,G01,Gt02,G0t2,gmInv_A)
+                        detTau_B=get_abTau2!(sbuf,a_B,b_B,Tau_B,indexB,subidx,r,G01,Gt02,G0t2,gmInv_B)
 
                         @fastmath p*= (detTau_A)^λ * (detTau_B)^(1-λ)
                         if rand(rng)<p
                             detg_A*=detTau_A
                             detg_B*=detTau_B
         
-                            GMupdate!(tmpA2,tmp2A,tmp22,tmpAA,a_A,b_A,Tau_A,gmInv_A)
-                            GMupdate!(tmpB2,tmp2B,tmp22,tmpBB,a_B,b_B,Tau_B,gmInv_B)
+                            GMupdate!(sbuf,a_A,b_A,Tau_A,gmInv_A)
+                            GMupdate!(sbuf,a_B,b_B,Tau_B,gmInv_B)
                             G4update!(tmpNN,tmp2N,subidx,r,Gt2,G02,Gt02,G0t2)
         
                             ss[2][lt,i,j]=sx
@@ -578,8 +589,8 @@ function ctrl_SCEEicr(path::String,model::_Hubbard_Para,indexA::Vector{Int64},in
                 # end
                 #####################################################################
 
-                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,idx,BLMs1,BRMs1,BMs1,BMsinv1,"Backward")
-                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN2,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,idx,BLMs2,BRMs2,BMs2,BMsinv2,"Backward")
+                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN_,ipiv,Gt1,G01,Gt01,G0t1,model.nodes,idx,BLMs1,BRMs1,BMs1,BMsinv1,"Backward")
+                G4!(II,tmpnn,tmpNn,tmpNN,tmpNN_,ipiv,Gt2,G02,Gt02,G0t2,model.nodes,idx,BLMs2,BRMs2,BMs2,BMsinv2,"Backward")
                 
                 #####################################################################
                 # if lt-1 != div(model.Nt,2)
@@ -657,6 +668,19 @@ function GMupdate!(tmpA2::Matrix{Float64},tmp2A::Matrix{Float64},tmp22::Matrix{F
     axpy!(-1.0, tmpAA, gmInv)
 end
 
+# Buffer-first overload
+function GMupdate!(sbuf, a::Matrix{Float64}, b::Matrix{Float64}, Tau::Matrix{Float64}, gmInv::Matrix{Float64})
+    tmp22 = sbuf.tmp22
+    if size(gmInv,1) == sbuf.nA
+        tmpA2 = sbuf.tmpA2; tmp2A = sbuf.tmp2A; tmpAA = sbuf.tmpAA
+    elseif size(gmInv,1) == sbuf.nB
+        tmpA2 = sbuf.tmpB2; tmp2A = sbuf.tmp2B; tmpAA = sbuf.tmpBB
+    else
+        error("GMupdate!: gmInv size does not match buffer nA/nB")
+    end
+    GMupdate!(tmpA2,tmp2A,tmp22,tmpAA,a,b,Tau,gmInv)
+end
+
 """
     Return det(Tau)
     Update s1 and overwrite a , b , Tau.
@@ -678,6 +702,22 @@ function get_abTau1!(tmpAA::Matrix{Float64},tmp2A::Matrix{Float64},a::Matrix{Flo
     mul!(Tau, b, a)
     Tau[1,1]+=1; Tau[2,2]+=1;
     return det(Tau)
+end
+
+# Buffer-first overload
+function get_abTau1!(sbuf,a::Matrix{Float64},b::Matrix{Float64},Tau::Matrix{Float64},index::Vector{Int64},subidx::Vector{Int64},r::Matrix{Float64},G0::Matrix{Float64},Gt0::Matrix{Float64},G0t::Matrix{Float64},gmInv::Matrix{Float64})
+    if length(index) == sbuf.nA
+        tmpAA = sbuf.tmpAA; tmp2A = sbuf.tmp2A
+    elseif length(index) == sbuf.nB
+        tmpAA = sbuf.tmpBB; tmp2A = sbuf.tmp2B
+    elseif size(gmInv,1) == sbuf.nA
+        tmpAA = sbuf.tmpAA; tmp2A = sbuf.tmp2A
+    elseif size(gmInv,1) == sbuf.nB
+        tmpAA = sbuf.tmpBB; tmp2A = sbuf.tmp2B
+    else
+        error("get_abTau1!: index/gmInv size does not match buffer nA/nB")
+    end
+    return get_abTau1!(tmpAA,tmp2A,a,b,Tau,index,subidx,r,G0,Gt0,G0t,gmInv)
 end
 
 """
@@ -703,6 +743,22 @@ function get_abTau2!(tmpAA::Matrix{Float64},tmp2A::Matrix{Float64},a::Matrix{Flo
     return det(Tau)
 end
 
+# Buffer-first overload
+function get_abTau2!(sbuf,a::Matrix{Float64},b::Matrix{Float64},Tau::Matrix{Float64},index::Vector{Int64},subidx::Vector{Int64},r::Matrix{Float64},G0::Matrix{Float64},Gt0::Matrix{Float64},G0t::Matrix{Float64},gmInv::Matrix{Float64})
+    if length(index) == sbuf.nA
+        tmpAA = sbuf.tmpAA; tmp2A = sbuf.tmp2A
+    elseif length(index) == sbuf.nB
+        tmpAA = sbuf.tmpBB; tmp2A = sbuf.tmp2B
+    elseif size(gmInv,1) == sbuf.nA
+        tmpAA = sbuf.tmpAA; tmp2A = sbuf.tmp2A
+    elseif size(gmInv,1) == sbuf.nB
+        tmpAA = sbuf.tmpBB; tmp2A = sbuf.tmp2B
+    else
+        error("get_abTau2!: index/gmInv size does not match buffer nA/nB")
+    end
+    return get_abTau2!(tmpAA,tmp2A,a,b,Tau,index,subidx,r,G0,Gt0,G0t,gmInv)
+end
+
 """
     Overwrite G according to eK and eKinv , with option mid
         Forward Wrap :      WrapK!(tmpNN,Gt,Gt0,G0t,eK,eKinv)
@@ -726,34 +782,65 @@ function WrapK!(tmpNN::Matrix{Float64},Gt::Matrix{Float64},Gt0::Matrix{Float64},
     copyto!(G0t, tmpNN)
 end
 
-"""
-    Overwrite G according to UV , D and option LR
-        LR=1 : Only Left:   G = (UV * D * UV') * G
-        LR=2 : Only Right   G = G * (UV * D * UV')'
-        LR=3 : Both Side and D will be changed to 1/D !!!   G = (UV * D * UV') * G * (UV * inv(D) * UV')'
-    Only wrap interaction part 
-    ------------------------------------------------------------------------------
-"""
-function WrapV!(tmpNN::Matrix{Float64},G::Matrix{Float64},D::Vector{Float64},UV::SubArray{Float64, 2, Array{Float64, 3}},LR::Int64)
-    if LR==1
-        mul!(tmpNN,UV',G)
-        mul!(G,Diagonal(D),tmpNN)
-        mul!(tmpNN,UV,G)
-        copyto!(G, tmpNN)
-    elseif LR==2
-        mul!(tmpNN, G , UV)
-        mul!(G, tmpNN , Diagonal(D))
-        mul!(tmpNN, G , UV')
-        copyto!(G, tmpNN)
-    else
-        mul!(tmpNN,UV',G)
-        mul!(G,tmpNN,UV)
-        mul!(tmpNN,Diagonal(D),G)
-        D.= 1 ./D
-        mul!(G,tmpNN,Diagonal(D))
-        mul!(tmpNN,UV,G)
-        mul!(G,tmpNN,UV')
+function GroverMatrix!(GM::Matrix{Float64},G1::SubArray{Float64, 2, Matrix{Float64}, Tuple{Vector{Int64}, Vector{Int64}}, false},G2::SubArray{Float64, 2, Matrix{Float64}, Tuple{Vector{Int64}, Vector{Int64}}, false})
+    mul!(GM,G1,G2)
+    lmul!(2.0, GM)
+    axpy!(-1.0, G1, GM)
+    axpy!(-1.0, G2, GM)
+    for i in diagind(GM)
+        GM[i] += 1.0
     end
 end
 
 
+function G4!(II,tmpnn,tmpNn,tmpNN,tmpNN_,ipiv,Gt::Array{Float64, 2},G0::Array{Float64, 2},Gt0::Array{Float64, 2},G0t::Array{Float64, 2},nodes::Vector{Int64},idx::Int64,BLMs::Array{Float64,3},BRMs::Array{Float64,3},BMs::Array{Float64,3},BMinvs::Array{Float64,3},direction="Forward")
+    Θidx=div(length(nodes),2)+1
+
+    get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,idx),view(BRMs,:,:,idx),Gt)
+    
+    if idx==Θidx
+        G0 .= Gt
+        if direction=="Forward"
+            Gt0.= Gt
+            G0t.= Gt .- II 
+        elseif direction=="Backward"
+            Gt0.= Gt .- II
+            G0t.= Gt
+        end
+    else
+        get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,Θidx),view(BRMs,:,:,Θidx),G0)
+    
+        Gt0 .= II
+        G0t .= II
+        if idx<Θidx
+            for j in idx:Θidx-1
+                if j==idx
+                    tmpNN_ .= Gt
+                else
+                    get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,j),view(BRMs,:,:,j),tmpNN_)
+                end
+                mul!(tmpNN,tmpNN_, G0t)
+                mul!(G0t, view(BMs,:,:,j), tmpNN)
+                tmpNN .= II .- tmpNN_
+                mul!(tmpNN_,Gt0, tmpNN)
+                mul!(Gt0, tmpNN_, view(BMinvs,:,:,j))
+                
+            end
+            lmul!(-1.0, Gt0)
+        else
+            for j in Θidx:idx-1
+                if j==Θidx
+                    tmpNN_ .= G0
+                else
+                    get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,j),view(BRMs,:,:,j),tmpNN_)
+                end
+                mul!(tmpNN, tmpNN_, Gt0)
+                mul!(Gt0, view(BMs,:,:,j), tmpNN)
+                tmpNN .= II .- tmpNN_
+                mul!(tmpNN_, G0t, tmpNN)
+                mul!(G0t, tmpNN_,view(BMinvs,:,:,j))
+            end
+            lmul!(-1.0, G0t)
+        end        
+    end
+end
