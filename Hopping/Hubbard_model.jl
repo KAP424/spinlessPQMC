@@ -177,6 +177,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         tmpVV[j,:,:]=tmpV[:,:]
         @assert norm(model.UV[:,:,j]*Diagonal(tmpN)*model.UV[:,:,j]'-tmpV)<1e-5
         @assert norm(model.UV[:,:,j]'*model.UV[:,:,j]-I(model.Ns))<1e-5
+        @assert norm(model.UV[:,:,j]-model.UV[:,:,j]')<1e-5
     end
 
     # TEST for not comute for V1,V2,V3

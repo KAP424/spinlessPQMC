@@ -21,8 +21,9 @@ function main()
     s=Initial_s(model,rng)
     path="C:/Users/admin/Desktop/JuliaDQMC/code/spinlessPQMC/test/"
 
-    # s=phy_update(path,model,s,2,true)
+    s=phy_update(path,model,s,2,true)
 
+    println(norm(model.UV[:,:,1]-model.UV[:,:,1]'))
 
     # Half
     indexA=area_index(Lattice,site,([1,1],[div(L,3),L]))
@@ -37,7 +38,7 @@ function main()
     Nλ=2
     Sweeps=10
 
-    ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
+    # ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
 end
 
 main()

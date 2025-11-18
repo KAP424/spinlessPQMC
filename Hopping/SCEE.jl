@@ -736,23 +736,23 @@ end
 """
 function WrapV!(tmpNN::Matrix{Float64},G::Matrix{Float64},D::Vector{Float64},UV::SubArray{Float64, 2, Array{Float64, 3}},LR::Int64)
     if LR==1
-        mul!(tmpNN,UV',G)
+        mul!(tmpNN,UV,G)
         mul!(G,Diagonal(D),tmpNN)
         mul!(tmpNN,UV,G)
         copyto!(G, tmpNN)
     elseif LR==2
         mul!(tmpNN, G , UV)
         mul!(G, tmpNN , Diagonal(D))
-        mul!(tmpNN, G , UV')
+        mul!(tmpNN, G , UV)
         copyto!(G, tmpNN)
     else
-        mul!(tmpNN,UV',G)
+        mul!(tmpNN,UV,G)
         mul!(G,tmpNN,UV)
         mul!(tmpNN,Diagonal(D),G)
         D.= 1 ./D
         mul!(G,tmpNN,Diagonal(D))
         mul!(tmpNN,UV,G)
-        mul!(G,tmpNN,UV')
+        mul!(G,tmpNN,UV)
     end
 end
 

@@ -87,7 +87,7 @@ function BM_F!(tmpN,tmpNN,BM,model::_Hubbard_Para, s::Array{UInt8, 3}, idx::Int6
 
             mul!(tmpNN,view(model.UV,:,:,j),BM)
             mul!(BM,Diagonal(tmpN),tmpNN)
-            mul!(tmpNN,view(model.UV,:,:,j)',BM)
+            mul!(tmpNN,view(model.UV,:,:,j),BM)
             copyto!(BM,tmpNN)
         end
     end
@@ -116,7 +116,7 @@ function BMinv_F!(tmpN,tmpNN,BM,model::_Hubbard_Para, s::Array{UInt8, 3}, idx::I
 
             mul!(tmpNN,BM,view(model.UV,:,:,j))
             mul!(BM,tmpNN,Diagonal(tmpN))
-            mul!(tmpNN,BM,view(model.UV,:,:,j)')
+            mul!(tmpNN,BM,view(model.UV,:,:,j))
             copyto!(BM,tmpNN)
         end
     end

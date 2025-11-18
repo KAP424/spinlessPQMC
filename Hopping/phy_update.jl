@@ -66,11 +66,11 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{UInt8,3},Sweeps::
         # println("\n Sweep: $loop ")
         for lt in 1:model.Nt
             #####################################################################
-            # # println(lt)
-            # if norm(G-Gτ(model,s,lt-1))>1e-5
-            #     println("\n Sweep: $loop ")
-            #     error("Wrap-$(lt)   :   $(norm(G-Gτ(model,s,lt-1)))")
-            # end
+            # println(lt)
+            if norm(G-Gτ(model,s,lt-1))>1e-5
+                println("\n Sweep: $loop ")
+                error("Wrap-$(lt)   :   $(norm(G-Gτ(model,s,lt-1)))")
+            end
             #####################################################################
 
             mul!(tmpNN,G,model.eKinv)
