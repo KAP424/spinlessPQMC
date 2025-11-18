@@ -13,7 +13,7 @@ function get_r!(UPD::UpdateBuffer_,Δs::Float64,Gt::Matrix{Float64})
     UPD.tmp2.= Δs.*[1.0, -1.0]
     UPD.tmp2 .= exp.(UPD.tmp2).-1
     mul!(UPD.r,UPD.uv,Diagonal(UPD.tmp2))
-    mul!(UPD.Δ,UPD.r,UPD.uv')
+    mul!(UPD.Δ,UPD.r,UPD.uv)
     mul!(UPD.r,UPD.Δ,view(Gt,UPD.subidx,UPD.subidx))
     axpby!(1.0,UPD.Δ, -1.0, UPD.r)   # r = I + Δ ⋅ (I - Gt1[subidx,subidx])
     UPD.r[1,1]+=1; UPD.r[2,2]+=1;
@@ -34,23 +34,23 @@ end
 """
 function WrapV!(tmpNN::Matrix{Float64},G::Matrix{Float64},D::Vector{Float64},UV::SubArray{Float64, 2, Array{Float64, 3}},LR::Int64)
     if LR==1
-        mul!(tmpNN,UV',G)
+        mul!(tmpNN,UV,G)
         mul!(G,Diagonal(D),tmpNN)
         mul!(tmpNN,UV,G)
         copyto!(G, tmpNN)
     elseif LR==2
         mul!(tmpNN, G , UV)
         mul!(G, tmpNN , Diagonal(D))
-        mul!(tmpNN, G , UV')
+        mul!(tmpNN, G , UV)
         copyto!(G, tmpNN)
     else
-        mul!(tmpNN,UV',G)
+        mul!(tmpNN,UV,G)
         mul!(G,tmpNN,UV)
         mul!(tmpNN,Diagonal(D),G)
         D.= 1 ./D
         mul!(G,tmpNN,Diagonal(D))
         mul!(tmpNN,UV,G)
-        mul!(G,tmpNN,UV')
+        mul!(G,tmpNN,UV)
     end
 end
 
@@ -91,8 +91,7 @@ function BM_F!(tmpN,tmpNN,BM,model::Hubbard_Para_, s::Array{UInt8, 3}, idx::Int6
                 tmpN[y]=-model.η[s[i,j,lt]]
             end
             tmpN.= exp.(tmpN)
-
-            mul!(tmpNN,view(model.UV,:,:,j)',BM)
+            mul!(tmpNN,view(model.UV,:,:,j),BM)
             mul!(BM,Diagonal(tmpN),tmpNN)
             mul!(tmpNN,view(model.UV,:,:,j),BM)
             copyto!(BM,tmpNN)
@@ -123,7 +122,7 @@ function BMinv_F!(tmpN,tmpNN,BM,model::Hubbard_Para_, s::Array{UInt8, 3}, idx::I
 
             mul!(tmpNN,BM,view(model.UV,:,:,j))
             mul!(BM,tmpNN,Diagonal(tmpN))
-            mul!(tmpNN,BM,view(model.UV,:,:,j)')
+            mul!(tmpNN,BM,view(model.UV,:,:,j))
             copyto!(BM,tmpNN)
         end
     end
@@ -159,7 +158,7 @@ function Gτ(model::Hubbard_Para_,s::Array{UInt8,3},τ::Int64)::Array{Float64,2}
                 E[x]=model.η[s[i,j,lt]]
                 E[y]=-model.η[s[i,j,lt]]
             end
-            BL=BL*model.UV[:,:,j]*Diagonal(exp.(E))*model.UV[:,:,j]'
+            BL=BL*model.UV[:,:,j]*Diagonal(exp.(E))*model.UV[:,:,j]
 
             #####################################################################
             # V=zeros(Float64,model.Ns,model.Ns)
@@ -181,7 +180,7 @@ function Gτ(model::Hubbard_Para_,s::Array{UInt8,3},τ::Int64)::Array{Float64,2}
         end
     end
     counter=0
-    for lt in axes(s,3)
+    for lt in 1:τ
         BR=model.eK*BR
         for j in reverse(axes(s,2))
             fill!(E,0.0)
@@ -190,7 +189,7 @@ function Gτ(model::Hubbard_Para_,s::Array{UInt8,3},τ::Int64)::Array{Float64,2}
                 E[x]=model.η[s[i,j,lt]]
                 E[y]=-model.η[s[i,j,lt]]
             end
-            BR=model.UV[:,:,j]*Diagonal(exp.(E))*model.UV[:,:,j]' *BR
+            BR=model.UV[:,:,j]*Diagonal(exp.(E))*model.UV[:,:,j] *BR
             #####################################################################
             # V=zeros(Float64,model.Ns,model.Ns)
             # for i in 1:size(s)[2]
@@ -234,14 +233,14 @@ function G4(model::Hubbard_Para_,s::Array{UInt8,3},τ1::Int64,τ2::Int64,directi
         counter=0
         for lt in 1:τ2
             UR[1,:,:]=model.eK*UR[1,:,:]
-            for j in size(s)[3]:-1:1
+            for j in reverse(axes(s,2))
                 E=zeros(model.Ns)
-                for i in 1:size(s)[2]
+                for i in axes(s,1)
                     x,y=model.nnidx[i,j]
-                    E[x]=model.η[s[lt,i,j]]
-                    E[y]=-model.η[s[lt,i,j]]
+                    E[x]=model.η[s[i,j,lt]]
+                    E[y]=-model.η[s[i,j,lt]]
                 end
-                UR[1,:,:]=model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'*UR[1,:,:]
+                UR[1,:,:]=model.UV[:,:,j]*Diagonal(exp.(E))*model.UV[:,:,j]'*UR[1,:,:]
             end
 
             counter+=1
@@ -254,14 +253,14 @@ function G4(model::Hubbard_Para_,s::Array{UInt8,3},τ1::Int64,τ2::Int64,directi
     
         counter=0
         for lt in model.Nt:-1:τ1+1
-            for j in 1:size(s)[3]
+            for j in axes(s,2)
                 E=zeros(model.Ns)
-                for i in 1:size(s)[2]
+                for i in axes(s,1)
                     x,y=model.nnidx[i,j]
-                    E[x]=model.η[s[lt,i,j]]
-                    E[y]=-model.η[s[lt,i,j]]
+                    E[x]=model.η[s[i,j,lt]]
+                    E[y]=-model.η[s[i,j,lt]]
                 end
-                UL[end,:,:]=UL[end,:,:]*model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'
+                UL[end,:,:]=UL[end,:,:]*model.UV[:,:,j]*Diagonal(exp.(E))*model.UV[:,:,j]'
             end
             UL[end,:,:]=UL[end,:,:]*model.eK
 
@@ -279,15 +278,15 @@ function G4(model::Hubbard_Para_,s::Array{UInt8,3},τ1::Int64,τ2::Int64,directi
             for lt2 in 1:model.BatchSize
                 BBs[lt,:,:]=model.eK*BBs[lt,:,:]
                 BBsInv[lt,:,:]=BBsInv[lt,:,:]*model.eKinv
-                for j in size(s)[3]:-1:1
+                for j in reverse(axes(s,2))
                     E=zeros(model.Ns)
-                    for i in 1:size(s)[2]
+                    for i in axes(s,1)
                         x,y=model.nnidx[i,j]
-                        E[x]=model.η[s[τ2+(lt-1)*model.BatchSize+lt2,i,j]]
-                        E[y]=-model.η[s[τ2+(lt-1)*model.BatchSize+lt2,i,j]]
+                        E[x]=model.η[s[i,j,τ2+(lt-1)*model.BatchSize+lt2]]
+                        E[y]=-model.η[s[i,j,τ2+(lt-1)*model.BatchSize+lt2]]
                     end
-                    BBs[lt,:,:]=model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'*BBs[lt,:,:]
-                    BBsInv[lt,:,:]=BBsInv[lt,:,:]*model.UV[:,:,j]*Diagonal(exp.(-model.α.*E))*model.UV[:,:,j]'
+                    BBs[lt,:,:]=model.UV[:,:,j]*Diagonal(exp.(E))*model.UV[:,:,j]'*BBs[lt,:,:]
+                    BBsInv[lt,:,:]=BBsInv[lt,:,:]*model.UV[:,:,j]*Diagonal(exp.(-E))*model.UV[:,:,j]'
 
                 end
             end
@@ -298,15 +297,15 @@ function G4(model::Hubbard_Para_,s::Array{UInt8,3},τ1::Int64,τ2::Int64,directi
         for lt in τ2+(size(BBs)[1]-1)*model.BatchSize+1:τ1
             BBs[end,:,:]=model.eK*BBs[end,:,:]
             BBsInv[end,:,:]=BBsInv[end,:,:]*model.eKinv
-            for j in size(s)[3]:-1:1
+            for j in reverse(axes(s,2))
                 E=zeros(model.Ns)
-                for i in 1:size(s)[2]
+                for i in axes(s,1)
                     x,y=model.nnidx[i,j]
-                    E[x]=model.η[s[lt,i,j]]
-                    E[y]=-model.η[s[lt,i,j]]
+                    E[x]=model.η[s[i,j,lt]]
+                    E[y]=-model.η[s[i,j,lt]]
                 end
-                BBs[end,:,:]=model.UV[:,:,j]*Diagonal(exp.(model.α.*E))*model.UV[:,:,j]'*BBs[end,:,:]
-                BBsInv[end,:,:]=BBsInv[end,:,:]*model.UV[:,:,j]*Diagonal(exp.(-model.α.*E))*model.UV[:,:,j]' 
+                BBs[end,:,:]=model.UV[:,:,j]*Diagonal(exp.(E))*model.UV[:,:,j]'*BBs[end,:,:]
+                BBsInv[end,:,:]=BBsInv[end,:,:]*model.UV[:,:,j]*Diagonal(exp.(-E))*model.UV[:,:,j]' 
             end
         end
     
@@ -360,3 +359,23 @@ function GroverMatrix(G1::Array{Float64,2},G2::Array{Float64,2})::Array{Float64,
 end
 
 
+"""
+    No Return. Overwrite A with inv(B)
+    ------------------------------------------------------------------------------
+"""
+function inv22!(A,B)
+    detB=det(B)
+    A[1,1]=B[2,2]/detB
+    A[1,2]=-B[1,2]/detB
+    A[2,1]=-B[2,1]/detB
+    A[2,2]=B[1,1]/detB
+end
+
+function inv22!(A)
+    A./det(A)
+    tmp=A[1,1]
+    A[1,1]=A[2,2]
+    A[2,2]=tmp
+    A[1,2]=-A[1,2]
+    A[2,1]=-A[2,1]
+end

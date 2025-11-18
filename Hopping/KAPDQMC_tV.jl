@@ -21,8 +21,8 @@ module KAPDQMC_tV
     # include("EE_update.jl")
     # export ctrl_EEicr
 
-    # include("SCEE.jl")
-    # export ctrl_SCEEicr
+    include("SCEE.jl")
+    export ctrl_SCEEicr
 
     # include("disorder_operate.jl")
     # export DO_icr

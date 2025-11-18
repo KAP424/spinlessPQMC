@@ -39,3 +39,5 @@ for i in axes(A,1)
     A[i,i] += 1e-3 * rand()
 end
 
+Ns=10
+Matrix{Float64}(I, Ns, Ns)

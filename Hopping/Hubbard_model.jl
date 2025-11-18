@@ -83,10 +83,8 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
     Pt=HalfeKinv*Pt
 
     Nt=2*cld(Θ,Δt)
-    α = sqrt(Δt * U / 2)
     γ = [1 + sqrt(6) / 3, 1 + sqrt(6) / 3, 1 - sqrt(6) / 3, 1 - sqrt(6) / 3]
-    η = [sqrt(2 * (3 - sqrt(6))), -sqrt(2 * (3 - sqrt(6))), sqrt(2 * (3 + sqrt(6))), -sqrt(2 * (3 + sqrt(6)))]
-    η .= η .* α
+    η = sqrt(Δt * U / 2).*[sqrt(2 * (3 - sqrt(6))), -sqrt(2 * (3 - sqrt(6))), sqrt(2 * (3 + sqrt(6))), -sqrt(2 * (3 + sqrt(6)))]
 
     nnidx=nnidx_F(Lattice,site)
     if div(Nt, 2) % BatchSize == 0
@@ -148,12 +146,33 @@ mutable struct PhyBuffer_
 	nN::Matrix{Float64}
 	zN::Matrix{Float64}   # 2 x Ns
 end
+
+function PhyBuffer(Ns,NN)
+    ns = div(Ns,2)
+    return PhyBuffer_(
+        Vector{Float64}(undef, ns),
+        Vector{LAPACK.BlasInt}(undef, ns),
+
+        Matrix{Float64}(undef, Ns, Ns),
+        Matrix{Float64}(undef, Ns, Ns),
+        Array{Float64}(undef, ns, Ns, NN),
+        Array{Float64}(undef, Ns, ns, NN),
+
+        Vector{Float64}(undef, Ns),
+        Matrix{Float64}(undef, Ns, Ns),
+        Matrix{Float64}(undef, Ns, ns),
+        Matrix{Float64}(undef, ns, ns),
+        Matrix{Float64}(undef, ns, Ns),
+        Matrix{Float64}(undef, 2, Ns),
+    )
+end
 # ---------------------------------------------------------------------------------------
 # Buffers for SCEE workflow
 mutable struct SCEEBuffer_
     II::Matrix{Float64}                 # Ns x Ns identity matrix (dense)
     N::Vector{Float64}                 # Ns
     N_::Vector{Float64}                # Ns
+    zN::Matrix{Float64}                # 2 x Ns
     nn::Matrix{Float64}             
     NN::Matrix{Float64}             
     NN_::Matrix{Float64}            
@@ -176,7 +195,9 @@ mutable struct G4Buffer_
 end
 
 mutable struct AreaBuffer_
-    gmInv
+    index::Vector{Int64}          # length nA
+    detg::Float64
+    gmInv::Matrix{Float64}          # nA x nA
     NN::Matrix{Float64}              # nA x nA
     N2::Matrix{Float64}              # nA x 2
     zN::Matrix{Float64}              # 2 x nA
@@ -186,32 +207,14 @@ mutable struct AreaBuffer_
 	ipiv::Vector{LAPACK.BlasInt}        # length ns
 end
 
-function PhyBuffer(Ns,NN)
-    ns = div(Ns,2)
-    return PhyBuffer_(
-        Vector{Float64}(undef, ns),
-        Vector{LAPACK.BlasInt}(undef, ns),
-
-        Matrix{Float64}(undef, Ns, Ns),
-        Matrix{Float64}(undef, Ns, Ns),
-        Array{Float64}(undef, ns, Ns, NN),
-        Array{Float64}(undef, Ns, ns, NN),
-
-        Vector{Float64}(undef, Ns),
-        Matrix{Float64}(undef, Ns, Ns),
-        Matrix{Float64}(undef, Ns, ns),
-        Matrix{Float64}(undef, ns, ns),
-        Matrix{Float64}(undef, ns, Ns),
-        Matrix{Float64}(undef, 2, Ns),
-    )
-end
-
-function SCEEBuffer(Ns,ns)
+function SCEEBuffer(Ns)
+    ns=div(Ns, 2)
     return SCEEBuffer_(
         Matrix{Float64}(I, Ns, Ns),
         Vector{Float64}(undef, Ns),
         Vector{Float64}(undef, Ns),
-        Matrix{Float64}(undef, Ns, Ns),
+        Matrix{Float64}(undef, 2, Ns),
+        Matrix{Float64}(undef, ns, ns),
         Matrix{Float64}(undef, Ns, Ns),
         Matrix{Float64}(undef, Ns, Ns),
         Matrix{Float64}(undef, Ns, ns),
@@ -219,10 +222,10 @@ function SCEEBuffer(Ns,ns)
         Vector{LAPACK.BlasInt}(undef, ns),
         Vector{Float64}(undef, ns),
     )
-    
 end
 
-function G4Buffer(Ns,ns,NN)
+function G4Buffer(Ns,NN)
+    ns=div(Ns, 2)
     return G4Buffer_(
         Matrix{Float64}(undef, Ns, Ns),
         Matrix{Float64}(undef, Ns, Ns),
@@ -236,16 +239,19 @@ function G4Buffer(Ns,ns,NN)
     )
 end
 
-function AreaBuffer(nA,ns)
+function AreaBuffer(index)
+    nA = length(index)
     return AreaBuffer_(
-        nothing,
+        index,
+        0.0,
+        Matrix{Float64}(undef, nA, nA),
         Matrix{Float64}(undef, nA, nA),
         Matrix{Float64}(undef, nA, 2),
         Matrix{Float64}(undef, 2, nA),
         Matrix{Float64}(undef, nA, 2),
         Matrix{Float64}(undef, 2, nA),
         Matrix{Float64}(undef, 2, 2),
-        Vector{LAPACK.BlasInt}(undef, ns),
+        Vector{LAPACK.BlasInt}(undef, nA),
     )
 end
 
