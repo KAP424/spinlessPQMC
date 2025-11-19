@@ -32,18 +32,18 @@ end
     Only wrap interaction part 
     ------------------------------------------------------------------------------
 """
-function WrapV!(tmpNN::Matrix{Float64},G::Matrix{Float64},D::Vector{Float64},UV::SubArray{Float64, 2, Array{Float64, 3}},LR::Int64)
-    if LR==1
+function WrapV!(tmpNN::Matrix{Float64},G::Matrix{Float64},D::Vector{Float64},UV::SubArray{Float64, 2, Array{Float64, 3}},LR::String)
+    if LR=="L"
         mul!(tmpNN,UV,G)
         mul!(G,Diagonal(D),tmpNN)
         mul!(tmpNN,UV,G)
         copyto!(G, tmpNN)
-    elseif LR==2
+    elseif LR=="R"
         mul!(tmpNN, G , UV)
         mul!(G, tmpNN , Diagonal(D))
         mul!(tmpNN, G , UV)
         copyto!(G, tmpNN)
-    else
+    elseif LR=="B"
         mul!(tmpNN,UV,G)
         mul!(G,tmpNN,UV)
         mul!(tmpNN,Diagonal(D),G)

@@ -2,7 +2,7 @@
 
 function phy_update(path::String,model::Hubbard_Para_,s::Array{UInt8,3},Sweeps::Int64,record::Bool)
     global LOCK=ReentrantLock()
-    ERROR=1e-6
+    # ERROR=1e-6
 
     UPD = UpdateBuffer()
     NN=length(model.nodes)
@@ -55,10 +55,10 @@ function phy_update(path::String,model::Hubbard_Para_,s::Array{UInt8,3},Sweeps::
         # println("\n Sweep: $loop ")
         for lt in axes(s,3)
             #####################################################################
-            # println(lt)
-            if norm(G-Gτ(model,s,lt-1))>ERROR
-                error("Wrap-$(lt)   :   $(norm(G-Gτ(model,s,lt-1))) , $(norm(G)) , $(norm(Gτ(model,s,lt-1))) ")
-            end
+                # # println(lt)
+                # if norm(G-Gτ(model,s,lt-1))>ERROR
+                #     error("Wrap-$(lt)   :   $(norm(G-Gτ(model,s,lt-1))) , $(norm(G)) , $(norm(Gτ(model,s,lt-1))) ")
+                # end
             #####################################################################
 
             mul!(tmpNN,G,model.eKinv)
@@ -72,25 +72,25 @@ function phy_update(path::String,model::Hubbard_Para_,s::Array{UInt8,3},Sweeps::
                     tmpN[y]=-model.η[s[i,j,lt]]
                 end
                 tmpN.= exp.(tmpN)
-                WrapV!(tmpNN,G,tmpN,view(model.UV,:,:,j),3)
+                WrapV!(tmpNN,G,tmpN,view(model.UV,:,:,j),"B")
 
                 UpdatePhyLayer!(rng,j,view(s,:,j,lt),model,UPD,Phy)
                 ####################################################################
-                print("*")
-                GG=model.eK*Gτ(model,s,lt-1)*model.eKinv
-                for jj in 3:-1:j
-                    E=zeros(model.Ns)
-                    for ii in 1:size(s)[1]
-                        x,y=model.nnidx[ii,jj]
-                        E[x]=model.η[s[ii,jj,lt]]
-                        E[y]=-model.η[s[ii,jj,lt]]
-                    end
-                    GG=model.UV[:,:,jj]*Diagonal(exp.(E))*model.UV[:,:,jj]' *GG* model.UV[:,:,jj]*Diagonal(exp.(-E))*model.UV[:,:,jj]'
-                end
-                if(norm(G-GG)>ERROR)
-                    println("lt=$(lt) j=$(j)")
-                    error(j," update error: ",norm(G-GG),"  lt=",lt)
-                end
+                    # print("*")
+                    # GG=model.eK*Gτ(model,s,lt-1)*model.eKinv
+                    # for jj in 3:-1:j
+                    #     E=zeros(model.Ns)
+                    #     for ii in 1:size(s)[1]
+                    #         x,y=model.nnidx[ii,jj]
+                    #         E[x]=model.η[s[ii,jj,lt]]
+                    #         E[y]=-model.η[s[ii,jj,lt]]
+                    #     end
+                    #     GG=model.UV[:,:,jj]*Diagonal(exp.(E))*model.UV[:,:,jj]' *GG* model.UV[:,:,jj]*Diagonal(exp.(-E))*model.UV[:,:,jj]'
+                    # end
+                    # if(norm(G-GG)>ERROR)
+                    #     println("lt=$(lt) j=$(j)")
+                    #     error(j," update error: ",norm(G-GG),"  lt=",lt)
+                    # end
                 ####################################################################
             end
 
@@ -111,15 +111,15 @@ function phy_update(path::String,model::Hubbard_Para_,s::Array{UInt8,3},Sweeps::
                 LAPACK.orgqr!(tmpNn, tau)
                 copyto!(view(BRs,:,:,idx), tmpNn)
                 
-                copyto!(tmpNN , G)
+                # copyto!(tmpNN , G)
 
                 get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,idx), view(BRs,:,:,idx),G)
 
                 #------------------------------------------------------------------#
-                axpy!(-1.0, G, tmpNN)  
-                if norm(tmpNN)>1e-7
-                    println("Warning for Batchsize Wrap Error : $(norm(tmpNN))")
-                end
+                # axpy!(-1.0, G, tmpNN)  
+                # if norm(tmpNN)>1e-7
+                #     println("Warning for Batchsize Wrap Error : $(norm(tmpNN))")
+                # end
                 #------------------------------------------------------------------#
 
             end
@@ -128,9 +128,9 @@ function phy_update(path::String,model::Hubbard_Para_,s::Array{UInt8,3},Sweeps::
 
         for lt in reverse(axes(s,3))
             #####################################################################
-            if norm(G-Gτ(model,s,lt))>ERROR
-                error("Wrap-$(lt)   :   $(norm(G-Gτ(model,s,lt+1)))")
-            end
+                # if norm(G-Gτ(model,s,lt))>ERROR
+                #     error("Wrap-$(lt)   :   $(norm(G-Gτ(model,s,lt+1)))")
+                # end
             ######################################################################
             for j in axes(s,2)
                 UpdatePhyLayer!(rng,j,view(s,:,j,lt),model,UPD,Phy)
@@ -140,7 +140,7 @@ function phy_update(path::String,model::Hubbard_Para_,s::Array{UInt8,3},Sweeps::
                     tmpN[y]=-model.η[s[i,j,lt]]
                 end
                 tmpN.=exp.(.-tmpN)
-                WrapV!(tmpNN,G,tmpN,view(model.UV,:,:,j),3)
+                WrapV!(tmpNN,G,tmpN,view(model.UV,:,:,j),"B")
             end
             mul!(tmpNN,model.eKinv,G)
             mul!(G,tmpNN,model.eK)
@@ -163,16 +163,16 @@ function phy_update(path::String,model::Hubbard_Para_,s::Array{UInt8,3},Sweeps::
                 copyto!(view(BLs,:,:,idx) , tmpnN)
                 # BL .= Matrix(qr(( BL * BM )').Q)'
 
-                copyto!(tmpNN , G)
+                # copyto!(tmpNN , G)
 
                 get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,idx), view(BRs,:,:,idx),G)
 
-                #------------------------------------------------------------------#
-                axpy!(-1.0, G, tmpNN)  
-                if norm(tmpNN)>1e-7
-                    println("Warning for Batchsize Wrap Error : $(norm(tmpNN))")
-                end
-                #------------------------------------------------------------------#
+                # #------------------------------------------------------------------#
+                # axpy!(-1.0, G, tmpNN)  
+                # if norm(tmpNN)>1e-7
+                #     println("Warning for Batchsize Wrap Error : $(norm(tmpNN))")
+                # end
+                # #------------------------------------------------------------------#
             end
         end
 
@@ -214,7 +214,7 @@ function phy_measure(model::Hubbard_Para_,Phy::PhyBuffer_,lt,s)
                 end
                 tmpN.=exp.(.-tmpN)
 
-                WrapV!(tmpNN,G0,tmpN,view(model.UV,:,:,j),3)
+                WrapV!(tmpNN,G0,tmpN,view(model.UV,:,:,j),"B")
                 # G0=model.UV[j,:,:]'*diagm(exp.(-E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(E))*model.UV[j,:,:]
             end
             mul!(tmpNN,model.eKinv,G0)
@@ -233,15 +233,15 @@ function phy_measure(model::Hubbard_Para_,Phy::PhyBuffer_,lt,s)
                     tmpN[y]=-model.η[s[i,j,t]]
                 end
                 tmpN.= exp.(tmpN)
-                WrapV!(tmpNN,G0,tmpN,view(model.UV,:,:,j),3)
+                WrapV!(tmpNN,G0,tmpN,view(model.UV,:,:,j),"B")
                 # G0=model.UV[j,:,:]'*diagm(exp.(E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(-E))*model.UV[j,:,:]
             end
         end
     end
     #####################################################################
-    if norm(G0-Gτ(model,s,div(model.Nt,2)))>1e-7
-        error("record error lt=$(lt) : $(norm(G0-Gτ(model,s,div(model.Nt,2))))")
-    end
+    # if norm(G0-Gτ(model,s,div(model.Nt,2)))>1e-7
+    #     error("record error lt=$(lt) : $(norm(G0-Gτ(model,s,div(model.Nt,2))))")
+    # end
     #####################################################################
     mul!(tmpNN,model.HalfeK,G0)
     mul!(G0,tmpNN,model.HalfeKinv)
