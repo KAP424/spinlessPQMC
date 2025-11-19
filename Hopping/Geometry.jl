@@ -1,5 +1,49 @@
 # 120° basis
-# PBC, OBC is not allowed
+# Only PBC! OBC is not allowed
+function nnidx_F(Lattice,site)
+    if Lattice=="SQUARE"
+        Ns=prod(site)
+        if length(site)==1
+            nnidx=fill((0, 0), div(Ns,2), 2)
+            count=1
+            for i in 1:2:Ns
+                nn=nn2idx(Lattice,site,i)
+                for j in eachindex(nn)
+                    nnidx[count,j]=(i,nn[j])
+                end
+                count+=1
+            end
+        elseif length(site)==2
+            nnidx=fill((0, 0), div(Ns,2), 4)
+            count=1
+            for x in 1:site[1]
+                for y in 1:site[2]
+                    if (x+y)%2==1
+                        i=x+(y-1)*site[1]
+                        nn=nn2idx(Lattice,site,i)
+                        for j in eachindex(nn)
+                            nnidx[count,j]=(i,nn[j])
+                        end
+                        count+=1
+                    end
+                end
+            end
+        end
+    elseif  occursin("HoneyComb", Lattice)
+        Ns=prod(site)*2
+        nnidx=fill((0, 0), div(Ns,2), 3)
+        count=1
+        for i in 1:2:Ns
+            nn=nn2idx(Lattice,site,i)
+            for j in eachindex(nn)
+                nnidx[count,j]=(i,nn[j])
+            end
+            count+=1
+        end
+    end
+    return nnidx
+end
+
 function nn2idx(Lattice::String,site::Vector{Int64},idx::Int64)
     if Lattice=="SQUARE"
         if length(site)==2
@@ -47,7 +91,6 @@ function nn2idx(Lattice::String,site::Vector{Int64},idx::Int64)
     end
     return nn
 end
-
 
 function xy_i(Lattice::String,site::Vector{Int64},x::Int64,y::Int64)::Int64
     if Lattice=="SQUARE"

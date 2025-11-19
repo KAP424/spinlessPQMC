@@ -7,10 +7,10 @@ module KAPDQMC_tV
     using Statistics
 
     include("Geometry.jl")
-    export K_Matrix,xy_i,i_xy,area_index,nn2idx
+    export K_Matrix,xy_i,i_xy,area_index,nn2idx,nnidx_F
 
     include("Hubbard_model.jl")
-    export Hubbard_Para,_Hubbard_Para,setμ
+    export Hubbard_Para,UpdateBuffer
 
     include("GreenMatrix.jl")
     export Gτ,G4,Initial_s,G12FF,GroverMatrix
@@ -18,8 +18,8 @@ module KAPDQMC_tV
     include("phy_update.jl")
     export phy_update,Poss,phy_measure
 
-    include("EE_update.jl")
-    export ctrl_EEicr
+    # include("EE_update.jl")
+    # export ctrl_EEicr
 
     include("SCEE.jl")
     export ctrl_SCEEicr

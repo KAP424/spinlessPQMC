@@ -1,61 +1,50 @@
 # Trotter e^V1 e^V2 e^V3 e^K
 
-function phy_update(path::String,model::_Hubbard_Para,s::Array{UInt8,3},Sweeps::Int64,record::Bool)
+function phy_update(path::String,model::Hubbard_Para_,s::Array{UInt8,3},Sweeps::Int64,record::Bool)
     global LOCK=ReentrantLock()
-    Ns=model.Ns
-    ns=div(model.Ns, 2)
+    # ERROR=1e-6
+
+    UPD = UpdateBuffer()
     NN=length(model.nodes)
+    Phy = PhyBuffer(model.Ns, NN) 
     Θidx=div(NN,2)+1
-    uv=[-2^0.5/2 -2^0.5/2;-2^0.5/2 2^0.5/2]
+
     name = if model.Lattice=="SQUARE" "□" 
     elseif model.Lattice=="HoneyComb60" "HC" 
     elseif model.Lattice=="HoneyComb120" "HC120" 
     else error("Lattice: $(model.Lattice) is not allowed !") end  
     file="$(path)/H_phy$(name)_t$(model.t)U$(model.U)size$(model.site)Δt$(model.Δt)Θ$(model.Θ)BS$(model.BatchSize).csv"
+
     rng=MersenneTwister(Threads.threadid()+time_ns())
-    elements = (1, 2, 3, 4)
-    samplers_dict = Dict{UInt8, Random.Sampler}()
-    for excluded in elements
-        allowed = [i for i in elements if i != excluded]
-        samplers_dict[excluded] = Random.Sampler(rng, allowed)
-    end
 
-    tau = Vector{Float64}(undef, ns)
-    ipiv = Vector{LAPACK.BlasInt}(undef, ns)
-
+    tau = Phy.tau
+    ipiv = Phy.ipiv
     Ek=Ev=0.0
     R0=zeros(Float64,4)
     R1=zeros(Float64,4)
     counter=0
 
-    G = Matrix{Float64}(undef ,model.Ns, model.Ns)
+    G = Phy.G
 
     # 预分配 BL 和 BR
-    BLs = Array{Float64}(undef, ns, model.Ns,NN)
-    BRs = Array{Float64}(undef, model.Ns, ns,NN)
-
+    BLs = Phy.BLs
+    BRs = Phy.BRs
     # 预分配临时数组
-    tmpN = Vector{Float64}(undef, Ns)
-    tmpNN = Matrix{Float64}(undef, Ns, Ns)
-    BM = Matrix{Float64}(undef, Ns, Ns)
-    tmpNn = Matrix{Float64}(undef, Ns, ns)
-    tmpnn = Matrix{Float64}(undef, ns, ns)
-    tmpnN = Matrix{Float64}(undef, ns, Ns)
-    tmp2N = Matrix{Float64}(undef, 2, Ns)
-    tmp22 = Matrix{Float64}(undef, 2,2)
-    tmp2 = Vector{Float64}(undef,2)
-
-    r = Matrix{Float64}(undef, 2,2)
-    Δ = Matrix{Float64}(undef, 2,2)
+    tmpN = Phy.N
+    tmpNN = Phy.NN
+    BM = Phy.BM
+    tmpNn = Phy.Nn
+    tmpnn = Phy.nn
+    tmpnN = Phy.nN
 
     copyto!(view(BRs,:,:,1) , model.Pt)
     transpose!(view(BLs,:,:,NN) , model.Pt)
 
     for idx in NN-1:-1:1
-        BM_F!(tmpN,tmpNN,BM,model, s, idx)
+        BM_F!(tmpN,tmpNN,BM,model,s,idx)
         mul!(tmpnN,view(BLs,:,:,idx+1), BM)
         LAPACK.gerqf!(tmpnN, tau)
-        LAPACK.orgrq!(tmpnN, tau, ns)
+        LAPACK.orgrq!(tmpnN, tau)
         copyto!(view(BLs,:,:,idx), tmpnN)
         # view(BLs,:,:,idx) .= Matrix(qr!(tmpNn).Q)'
     end
@@ -64,74 +53,49 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{UInt8,3},Sweeps::
     get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,1), view(BRs,:,:,1),G)
     for _ in 1:Sweeps
         # println("\n Sweep: $loop ")
-        for lt in 1:model.Nt
+        for lt in axes(s,3)
             #####################################################################
-            # println(lt)
-            if norm(G-Gτ(model,s,lt-1))>1e-5
-                println("\n Sweep: $loop ")
-                error("Wrap-$(lt)   :   $(norm(G-Gτ(model,s,lt-1)))")
-            end
+                # # println(lt)
+                # if norm(G-Gτ(model,s,lt-1))>ERROR
+                #     error("Wrap-$(lt)   :   $(norm(G-Gτ(model,s,lt-1))) , $(norm(G)) , $(norm(Gτ(model,s,lt-1))) ")
+                # end
             #####################################################################
 
             mul!(tmpNN,G,model.eKinv)
             mul!(G,model.eK,tmpNN)
             # G=model.eK*G*model.eKinv
             
-            for j in 3:-1:1
-                for i in 1:size(s)[2]
+            for j in reverse(axes(s,2))
+                for i in axes(s,1)
                     x,y=model.nnidx[i,j]
-                    tmpN[x]=model.η[s[lt,i,j]]
-                    tmpN[y]=-model.η[s[lt,i,j]]
+                    tmpN[x]=model.η[s[i,j,lt]]
+                    tmpN[y]=-model.η[s[i,j,lt]]
                 end
-                tmpN.= exp.(model.α.*tmpN)
+                tmpN.= exp.(tmpN)
+                WrapV!(tmpNN,G,tmpN,view(model.UV,:,:,j),"B")
 
-                WrapV!(tmpNN,G,tmpN,view(model.UV,:,:,j),3)
-
-                for i in 1:size(s)[2]
-                    x,y=model.nnidx[i,j]
-                    subidx=[x,y]
-
-                    sx = rand(rng,  samplers_dict[s[lt,i,j]])
-                    p=get_r!(uv,tmp2,Δ,tmp22,r,model.α,model.η[sx]- model.η[s[lt,i,j]],subidx,G)
-                    p*=model.γ[sx]/model.γ[s[lt,i,j]]
-                    if p<-1e-3
-                        println("Negative Sign: $(p)")
-                    end
-                    #####################################################################
-                    # ss=copy(s)
-                    # ss[lt,i,j]=sx
-                    # dassda=p-Poss(model,ss)/Poss(model,s)
-                    # if abs(dassda)>1e-5
-                    #     error("Poss error lt=$(lt) No.$(j): $(dassda)")
+                UpdatePhyLayer!(rng,j,view(s,:,j,lt),model,UPD,Phy)
+                ####################################################################
+                    # print("*")
+                    # GG=model.eK*Gτ(model,s,lt-1)*model.eKinv
+                    # for jj in 3:-1:j
+                    #     E=zeros(model.Ns)
+                    #     for ii in 1:size(s)[1]
+                    #         x,y=model.nnidx[ii,jj]
+                    #         E[x]=model.η[s[ii,jj,lt]]
+                    #         E[y]=-model.η[s[ii,jj,lt]]
+                    #     end
+                    #     GG=model.UV[:,:,jj]*Diagonal(exp.(E))*model.UV[:,:,jj]' *GG* model.UV[:,:,jj]*Diagonal(exp.(-E))*model.UV[:,:,jj]'
                     # end
-                    #####################################################################
-
-                    if rand(rng)<p
-                        Gupdate!(tmpNN,tmp2N,subidx,r,G)
-                        s[lt,i,j]=sx
-                        #####################################################################
-                        # print("*")
-                        # GG=model.eK*Gτ(model,s,lt-1)*model.eKinv
-                        # for jj in 3:-1:j
-                        #     E=zeros(model.Ns)
-                        #     for ii in 1:size(s)[2]
-                        #         x,y=model.nnidx[ii,jj]
-                        #         E[x]=model.η[s[lt,ii,jj]]
-                        #         E[y]=-model.η[s[lt,ii,jj]]
-                        #     end
-                        #     GG=model.UV[:,:,jj]*Diagonal(exp.(model.α*E))*model.UV[:,:,jj]' *GG* model.UV[:,:,jj]*Diagonal(exp.(-model.α*E))*model.UV[:,:,jj]'
-                        # end
-                        # if(norm(G-GG)>1e-5)
-                        #     println("loop=$(loop) lt=$(lt) j=$(j)")
-                        #     error(j," update error: ",norm(G-GG),"  lt=",lt)
-                        # end
-                        #####################################################################
-                    end
-                end
+                    # if(norm(G-GG)>ERROR)
+                    #     println("lt=$(lt) j=$(j)")
+                    #     error(j," update error: ",norm(G-GG),"  lt=",lt)
+                    # end
+                ####################################################################
             end
 
             if record && abs(idx-Θidx)<=1
-                tmp=phy_measure(tmpN,tmpNN,model,G,lt,s)
+                tmp=phy_measure(model,Phy,lt,s)
                 Ek+=tmp[1]
                 Ev+=tmp[2]
                 axpy!(1,tmp[3],R0)
@@ -144,59 +108,45 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{UInt8,3},Sweeps::
                 BM_F!(tmpN,tmpNN,BM,model, s, idx - 1)
                 mul!(tmpNn, BM, view(BRs,:,:,idx-1))
                 LAPACK.geqrf!(tmpNn, tau)
-                LAPACK.orgqr!(tmpNn, tau, ns)
+                LAPACK.orgqr!(tmpNn, tau)
                 copyto!(view(BRs,:,:,idx), tmpNn)
                 
-                copyto!(tmpNN , G)
+                # copyto!(tmpNN , G)
 
                 get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,idx), view(BRs,:,:,idx),G)
 
                 #------------------------------------------------------------------#
-                axpy!(-1.0, G, tmpNN)  
-                if norm(tmpNN)>1e-7
-                    println("Warning for Batchsize Wrap Error : $(norm(tmpNN))")
-                end
+                # axpy!(-1.0, G, tmpNN)  
+                # if norm(tmpNN)>1e-7
+                #     println("Warning for Batchsize Wrap Error : $(norm(tmpNN))")
+                # end
                 #------------------------------------------------------------------#
 
             end
 
         end
 
-        for lt in model.Nt:-1:1
-            
+        for lt in reverse(axes(s,3))
             #####################################################################
-            # if norm(G-Gτ(model,s,lt))>1e-4
-            #     error("Wrap-$(lt)   :   $(norm(G-Gτ(model,s,lt+1)))")
-            # end
+                # if norm(G-Gτ(model,s,lt))>ERROR
+                #     error("Wrap-$(lt)   :   $(norm(G-Gτ(model,s,lt+1)))")
+                # end
             ######################################################################
-
-            for j in 1:size(s)[3]
-                for i in 1:size(s)[2]
+            for j in axes(s,2)
+                UpdatePhyLayer!(rng,j,view(s,:,j,lt),model,UPD,Phy)
+                for i in axes(s,1)
                     x,y=model.nnidx[i,j]
-                    subidx=[x,y]
-                    
-                    sx = rand(rng,  samplers_dict[s[lt,i,j]])
-                    p=get_r!(uv,tmp2,Δ,tmp22,r,model.α,model.η[sx]- model.η[s[lt,i,j]],subidx,G)
-                    p*=model.γ[sx]/model.γ[s[lt,i,j]]
-                    if p<-1e-3
-                        println("Negative Sign: $(p)")
-                    end
-                    if rand(rng)<p
-                        Gupdate!(tmpNN,tmp2N,subidx,r,G)
-                        s[lt,i,j]=sx
-                    end
-
-                    tmpN[x]=model.η[s[lt,i,j]]
-                    tmpN[y]=-model.η[s[lt,i,j]]
+                    tmpN[x]=model.η[s[i,j,lt]]
+                    tmpN[y]=-model.η[s[i,j,lt]]
                 end
-                tmpN.=exp.(.-model.α.*tmpN)
-                WrapV!(tmpNN,G,tmpN,view(model.UV,:,:,j),3)
+                tmpN.=exp.(.-tmpN)
+                WrapV!(tmpNN,G,tmpN,view(model.UV,:,:,j),"B")
             end
             mul!(tmpNN,model.eKinv,G)
             mul!(G,tmpNN,model.eK)
             
             if record && abs(idx-Θidx)<=1
-                tmp=phy_measure(tmpN,tmpNN,model,G,lt-1,s)
+                tmp=phy_measure(model,Phy,lt-1,s)
                 Ek+=tmp[1]
                 Ev+=tmp[2]
                 axpy!(1,tmp[3],R0)
@@ -209,20 +159,20 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{UInt8,3},Sweeps::
                 BM_F!(tmpN,tmpNN,BM,model, s, idx)
                 mul!(tmpnN,view(BLs,:,:,idx+1),BM)
                 LAPACK.gerqf!(tmpnN, tau)
-                LAPACK.orgrq!(tmpnN, tau, ns)
+                LAPACK.orgrq!(tmpnN, tau)
                 copyto!(view(BLs,:,:,idx) , tmpnN)
                 # BL .= Matrix(qr(( BL * BM )').Q)'
 
-                copyto!(tmpNN , G)
+                # copyto!(tmpNN , G)
 
                 get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,idx), view(BRs,:,:,idx),G)
 
-                #------------------------------------------------------------------#
-                axpy!(-1.0, G, tmpNN)  
-                if norm(tmpNN)>1e-7
-                    println("Warning for Batchsize Wrap Error : $(norm(tmpNN))")
-                end
-                #------------------------------------------------------------------#
+                # #------------------------------------------------------------------#
+                # axpy!(-1.0, G, tmpNN)  
+                # if norm(tmpNN)>1e-7
+                #     println("Warning for Batchsize Wrap Error : $(norm(tmpNN))")
+                # end
+                # #------------------------------------------------------------------#
             end
         end
 
@@ -241,44 +191,31 @@ function phy_update(path::String,model::_Hubbard_Para,s::Array{UInt8,3},Sweeps::
     return s
 end 
 
-"""
-    No Return. Overwrite G 
-        G = I - BR ⋅ inv(BL ⋅ BR) ⋅ BL 
-    ------------------------------------------------------------------------------
-"""
-function get_G!(tmpnn,tmpNn,ipiv,BL,BR,G)
-    mul!(tmpnn, BL,BR)
-    LAPACK.getrf!(tmpnn,ipiv)
-    LAPACK.getri!(tmpnn, ipiv)
-    mul!(tmpNn, BR, tmpnn)
-    mul!(G, tmpNn, BL)
-    lmul!(-1.0,G)
-    for i in diagind(G)
-        G[i]+=1
-    end
-end
 
-function phy_measure(tmpN,tmpNN,model,G,lt,s)
+
+function phy_measure(model::Hubbard_Para_,Phy::PhyBuffer_,lt,s)
     """
     (Ek,Ev,R0,R1)    
     """
-    G0=G[:,:]
+    G0=Phy.G[:,:]
+    tmpN=Phy.N
+    tmpNN=Phy.NN
     tmp=zeros(Float64,4)
     R0=zeros(Float64,4)
     R1=zeros(Float64,4)
     
     if lt>model.Nt/2
         for t in lt:-1:div(model.Nt,2)+1
-            for j in 1:size(s)[3]
-                for i in 1:size(s)[2]
+            for j in axes(s,2)
+                for i in axes(s,1)
                     x,y=model.nnidx[i,j]
-                    tmpN[x]=model.η[s[t,i,j]]
-                    tmpN[y]=-model.η[s[t,i,j]]
+                    tmpN[x]=model.η[s[i,j,t]]
+                    tmpN[y]=-model.η[s[i,j,t]]
                 end
-                tmpN.=exp.(.-model.α.*tmpN)
+                tmpN.=exp.(.-tmpN)
 
-                WrapV!(tmpNN,G0,tmpN,view(model.UV,:,:,j),3)
-                # G0=model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:]
+                WrapV!(tmpNN,G0,tmpN,view(model.UV,:,:,j),"B")
+                # G0=model.UV[j,:,:]'*diagm(exp.(-E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(E))*model.UV[j,:,:]
             end
             mul!(tmpNN,model.eKinv,G0)
             mul!(G0,tmpNN,model.eK)
@@ -289,20 +226,20 @@ function phy_measure(tmpN,tmpNN,model,G,lt,s)
             mul!(tmpNN,G0,model.eKinv)
             mul!(G0,model.eK,tmpNN)
             # G0=model.eK*G0*model.eKinv
-            for j in 3:-1:1
-                for i in 1:size(s)[2]
+            for j in reverse(axes(s,2))
+                for i in axes(s,1)
                     x,y=model.nnidx[i,j]
-                    tmpN[x]=model.η[s[t,i,j]]
-                    tmpN[y]=-model.η[s[t,i,j]]
+                    tmpN[x]=model.η[s[i,j,t]]
+                    tmpN[y]=-model.η[s[i,j,t]]
                 end
-                tmpN.= exp.(model.α.*tmpN)
-                WrapV!(tmpNN,G0,tmpN,view(model.UV,:,:,j),3)
-                # G0=model.UV[j,:,:]'*diagm(exp.(model.α*E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(-model.α*E))*model.UV[j,:,:]
+                tmpN.= exp.(tmpN)
+                WrapV!(tmpNN,G0,tmpN,view(model.UV,:,:,j),"B")
+                # G0=model.UV[j,:,:]'*diagm(exp.(E))*model.UV[j,:,:] *G0* model.UV[j,:,:]'*diagm(exp.(-E))*model.UV[j,:,:]
             end
         end
     end
     #####################################################################
-    # if norm(G0-Gτ(model,s,div(model.Nt,2)))>1e-3
+    # if norm(G0-Gτ(model,s,div(model.Nt,2)))>1e-7
     #     error("record error lt=$(lt) : $(norm(G0-Gτ(model,s,div(model.Nt,2))))")
     # end
     #####################################################################
@@ -366,50 +303,17 @@ function phy_measure(tmpN,tmpNN,model,G,lt,s)
     return Ek,Ev,R0,R1
 end
 
-"""
-    No Return. Overwrite A with inv(B)
-    ------------------------------------------------------------------------------
-"""
-function inv22!(A,B)
-    detB=det(B)
-    A[1,1]=B[2,2]/detB
-    A[1,2]=-B[1,2]/detB
-    A[2,1]=-B[2,1]/detB
-    A[2,2]=B[1,1]/detB
-end
-
-"""
-    Return p=det(r). Overwrite 
-        Δ = uv ⋅ diag( exp(α⋅[-2s,2s]) - I ) ⋅ uvᵀ 
-        r = I + Δ ⋅ (I - Gt[subidx,subidx])
-        r ≡ inv(r) ⋅ ̇Δ .
-    ------------------------------------------------------------------------------
-"""
-function get_r!(uv::Matrix{Float64},tmp2::Vector{Float64},Δ::Matrix{Float64},tmp22::Matrix{Float64},r::Matrix{Float64},α::Float64,Δs::Float64,subidx::Vector{Int64},Gt::Matrix{Float64})
-    tmp2.= Δs.*[1.0, -1.0]
-    tmp2 .= exp.(α.*tmp2).-1
-    mul!(r,uv,Diagonal(tmp2))
-    mul!(Δ,r,uv')
-    mul!(r,Δ,view(Gt,subidx,subidx))
-    axpby!(1.0,Δ, -1.0, r)   # r = I + Δ ⋅ (I - Gt1[subidx,subidx])
-    r[1,1]+=1; r[2,2]+=1;
-    p=det(r)
-    # redefine r=inv(r) ⋅ ̇Δ 
-    inv22!(tmp22,r)
-    mul!(r,tmp22,Δ)
-    return p
-end
 
 """
     No Return. Overwrite G = G - G · inv(r) ⋅ Δ · (I-G)
     ------------------------------------------------------------------------------
 """
-function Gupdate!(tmpNN::Matrix{Float64},tmp2N::Matrix{Float64},subidx::Vector{Int64},r::Matrix{Float64},G::Matrix{Float64})
-    mul!(tmp2N,r,view(G,subidx,:))
-    lmul!(-1.0,tmp2N)
-    axpy!(1.0,r,view(tmp2N,:,subidx))   # useful for GΘτ,Gτ
-    mul!(tmpNN, view(G,:,subidx),tmp2N)
-    axpy!(-1.0, tmpNN, G)
+function Gupdate!(Phy::PhyBuffer_,UPD::UpdateBuffer_)
+    mul!(Phy.zN,UPD.r,view(Phy.G,UPD.subidx,:))
+    lmul!(-1.0,Phy.zN)
+    axpy!(1.0,UPD.r,view(Phy.zN,:,UPD.subidx))   # useful for GΘτ,Gτ
+    mul!(Phy.NN, view(Phy.G,:,UPD.subidx),Phy.zN)
+    axpy!(-1.0, Phy.NN, Phy.G)
 end
 
 """
@@ -424,15 +328,31 @@ function Poss(model,s)
         BR=model.eK*BR
         for j in size(s)[3]:-1:1
             for i in 1:size(s)[2]
-                p*=model.γ[s[lt,i,j]]
+                p*=model.η[s[lt,i,j]]
                 x,y=model.nnidx[i,j]
                 E[x]=model.η[s[lt,i,j]]
                 E[y]=-model.η[s[lt,i,j]]
             end
-            BR=model.UV[:,:,j]*Diagonal(exp.(model.α*E))*model.UV[:,:,j]*BR
+            BR=model.UV[:,:,j]*Diagonal(exp.(E))*model.UV[:,:,j]*BR
         end
     end
     BR=model.Pt'*BR
     return det(BR)*p
 end
 
+function UpdatePhyLayer!(rng,j,s,model::Hubbard_Para_,UPD::UpdateBuffer_,Phy::PhyBuffer_)
+    for i in axes(s,1)
+        x,y=model.nnidx[i,j]
+        UPD.subidx.=[x,y]
+        sx = rand(rng, model.samplers_dict[s[i]])
+        p=get_r!(UPD,model.η[sx]- model.η[s[i]],Phy.G)
+        p*=model.γ[sx]/model.γ[s[i]]
+        if p<-1e-3
+            println("Negative Sign: $(p)")
+        end
+        if rand(rng)<p
+            Gupdate!(Phy,UPD)
+            s[i]=sx
+        end
+    end
+end
