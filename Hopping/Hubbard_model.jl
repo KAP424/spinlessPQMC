@@ -84,7 +84,7 @@ function Hubbard_Para(t,U,Lattice::String,site,Δt,Θ,BatchSize,Initial::String)
 
     Nt=2*cld(Θ,Δt)
     γ = [1 + sqrt(6) / 3, 1 + sqrt(6) / 3, 1 - sqrt(6) / 3, 1 - sqrt(6) / 3]
-    η = sqrt(Δt * U / 2).*[sqrt(2 * (3 - sqrt(6))), -sqrt(2 * (3 - sqrt(6))), sqrt(2 * (3 + sqrt(6))), -sqrt(2 * (3 + sqrt(6)))]
+    η = sqrt(Δt * U).*[sqrt(3 - sqrt(6)), -sqrt(3 - sqrt(6)), sqrt(3 + sqrt(6)), -sqrt(3 + sqrt(6))]
 
     nnidx=nnidx_F(Lattice,site)
     if div(Nt, 2) % BatchSize == 0

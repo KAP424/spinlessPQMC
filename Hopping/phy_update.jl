@@ -2,7 +2,7 @@
 
 function phy_update(path::String,model::Hubbard_Para_,s::Array{UInt8,3},Sweeps::Int64,record::Bool)
     global LOCK=ReentrantLock()
-    # ERROR=1e-6
+    ERROR=1e-6
 
     UPD = UpdateBuffer()
     NN=length(model.nodes)
@@ -50,7 +50,7 @@ function phy_update(path::String,model::Hubbard_Para_,s::Array{UInt8,3},Sweeps::
     end
 
     idx=1
-    get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,1), view(BRs,:,:,1),G)
+    get_G!(tmpnn,tmpnN,ipiv,view(BLs,:,:,1), view(BRs,:,:,1),G)
     for _ in 1:Sweeps
         # println("\n Sweep: $loop ")
         for lt in axes(s,3)
@@ -113,7 +113,7 @@ function phy_update(path::String,model::Hubbard_Para_,s::Array{UInt8,3},Sweeps::
                 
                 # copyto!(tmpNN , G)
 
-                get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,idx), view(BRs,:,:,idx),G)
+                get_G!(tmpnn,tmpnN,ipiv,view(BLs,:,:,idx), view(BRs,:,:,idx),G)
 
                 #------------------------------------------------------------------#
                 # axpy!(-1.0, G, tmpNN)  
@@ -165,7 +165,7 @@ function phy_update(path::String,model::Hubbard_Para_,s::Array{UInt8,3},Sweeps::
 
                 # copyto!(tmpNN , G)
 
-                get_G!(tmpnn,tmpNn,ipiv,view(BLs,:,:,idx), view(BRs,:,:,idx),G)
+                get_G!(tmpnn,tmpnN,ipiv,view(BLs,:,:,idx), view(BRs,:,:,idx),G)
 
                 # #------------------------------------------------------------------#
                 # axpy!(-1.0, G, tmpNN)  

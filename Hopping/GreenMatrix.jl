@@ -59,17 +59,26 @@ end
         G = I - BR ⋅ inv(BL ⋅ BR) ⋅ BL 
     ------------------------------------------------------------------------------
 """
-function get_G!(tmpnn,tmpNn,ipiv,BL,BR,G)
-    mul!(tmpnn, BL,BR)
-    LAPACK.getrf!(tmpnn,ipiv)
-    LAPACK.getri!(tmpnn, ipiv)
-    mul!(tmpNn, BR, tmpnn)
-    mul!(G, tmpNn, BL)
-    lmul!(-1.0,G)
-    for i in diagind(G)
-        G[i]+=1
+function get_G!(tmpnn,tmpnN,ipiv,BL,BR,G)
+    # 目标: 计算 G = I - BR * inv(BL * BR) * BL，避免显式求逆 (getri!)
+    # 步骤:
+    # 1. tmpnn ← M = BL * BR
+    # 2. LU 分解 tmpnn 得到 pivot ipiv
+    # 3. tmpnN ← BL (右端)，求解 M * X = BL 得 X = inv(M)*BL  (使用 getrs!)
+    # 4. G ← BR * X
+    # 5. G ← I - G
+    # 数值优势: 避免显式逆，提升稳定性与性能，减少 FLOPs。
+    mul!(tmpnn, BL, BR)                 # tmpnn = M = BL*BR
+    LAPACK.getrf!(tmpnn, ipiv)          # LU 分解 (in-place)
+    tmpnN .= BL                         # 右端初始化: RHS = BL
+    LAPACK.getrs!('N', tmpnn, ipiv, tmpnN) # 解 M * X = BL, 结果写回 tmpNn
+    mul!(G, BR, tmpnN)                  # G = BR * inv(M) * BL
+    lmul!(-1.0, G)                      # G = - G
+    @inbounds for i in diagind(G)       # G = I - BR * inv(M) * BL
+        G[i] += 1.0
     end
 end
+
 
 function BM_F!(tmpN,tmpNN,BM,model::Hubbard_Para_, s::Array{UInt8, 3}, idx::Int64)
     """
@@ -372,7 +381,7 @@ function inv22!(A,B)
 end
 
 function inv22!(A)
-    A./det(A)
+    A./=det(A)
     tmp=A[1,1]
     A[1,1]=A[2,2]
     A[2,2]=tmp

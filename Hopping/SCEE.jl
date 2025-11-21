@@ -3,7 +3,7 @@
 
 function ctrl_SCEEicr(path::String,model::Hubbard_Para_,indexA::Vector{Int64},indexB::Vector{Int64},Sweeps::Int64,λ::Float64,Nλ::Int64,ss::Vector{Array{UInt8,3}},record)
     global LOCK=ReentrantLock()
-    # ERROR=1e-6
+    ERROR=1e-6
     # WrapErr = Matrix{Float64}(undef, model.Ns, model.Ns)
 
     NN=length(model.nodes)
@@ -33,10 +33,10 @@ function ctrl_SCEEicr(path::String,model::Hubbard_Para_,indexA::Vector{Int64},in
         end
     end
     
-    Gt1,G01,Gt01,G0t1,BLMs1,BRMs1,BMs1,BMsinv1 =
-        G1.Gt, G1.G0, G1.Gt0, G1.G0t, G1.BLMs, G1.BRMs, G1.BMs, G1.BMinvs
-    Gt2,G02,Gt02,G0t2,BLMs2,BRMs2,BMs2,BMsinv2 =
-        G2.Gt, G2.G0, G2.Gt0, G2.G0t, G2.BLMs, G2.BRMs, G2.BMs, G2.BMinvs
+    Gt1,Gt01,G0t1,BLMs1,BRMs1,BMs1,BMsinv1 =
+        G1.Gt, G1.Gt0, G1.G0t, G1.BLMs, G1.BRMs, G1.BMs, G1.BMinvs
+    Gt2,Gt02,G0t2,BLMs2,BRMs2,BMs2,BMsinv2 =
+        G2.Gt, G2.Gt0, G2.G0t, G2.BLMs, G2.BRMs, G2.BMs, G2.BMinvs
 
     # 预分配临时数组
     tmpN = SCEE.N
@@ -97,7 +97,7 @@ function ctrl_SCEEicr(path::String,model::Hubbard_Para_,indexA::Vector{Int64},in
         # println("\n ====== Sweep $loop / $Sweeps ======")
         for lt in 1:model.Nt
             # #####################################################################
-            #     # # println("\n WrapTime check at lt=$lt")
+            # #     # # println("\n WrapTime check at lt=$lt")
             #     Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt-1,div(model.Nt,2),"Forward")
             #     Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt-1,div(model.Nt,2),"Forward")
                     
@@ -265,7 +265,7 @@ function ctrl_SCEEicr(path::String,model::Hubbard_Para_,indexA::Vector{Int64},in
             for j in axes(ss[1],2)
                 # update
                 UpdateSCEELayer!(rng,j,view(ss[1],:,j,lt),view(ss[2],:,j,lt),G1,G2,A,B,model,UPD,SCEE,λ)
-                # #####################################################################
+                #####################################################################
                 #     print('*')
                 #     Gt1_,G01_,Gt01_,G0t1_=G4(model,ss[1],lt-1,div(model.Nt,2),"Forward")
                 #     Gt2_,G02_,Gt02_,G0t2_=G4(model,ss[2],lt-1,div(model.Nt,2),"Forward")
@@ -310,7 +310,7 @@ function ctrl_SCEEicr(path::String,model::Hubbard_Para_,indexA::Vector{Int64},in
                 #         println(norm(gmInv_A_-A.gmInv)," ",norm(B.gmInv-gmInv_B_)," ",abs(A.detg-detg_A_)," ",abs(B.detg-detg_B_))
                 #         error("s1:  $lt  $j:,,,asdasdasd")
                 #     end
-                # ######################################################################
+                ######################################################################
                 
                 for i in axes(ss[1],1)
                     x,y=model.nnidx[i,j]
@@ -461,8 +461,7 @@ end
 """
 function GMupdate!(A::AreaBuffer_)
     mul!(A.N2, A.gmInv,A.a )
-    # inv22!(A.Tau)
-    A.Tau .= inv(A.Tau)
+    inv22!(A.Tau)
     mul!(A.zN,A.Tau,A.b)
     mul!(A.NN, A.N2, A.zN)
     axpy!(-1.0, A.NN, A.gmInv)
@@ -558,10 +557,10 @@ function G4!(SCEE::SCEEBuffer_,G::G4Buffer_,nodes::Vector{Int64},idx::Int64,dire
     Θidx=div(length(nodes),2)+1
     BLMs, BRMs, BMs, BMinvs, Gt, G0, Gt0, G0t =
         G.BLMs, G.BRMs, G.BMs, G.BMinvs, G.Gt, G.G0, G.Gt0, G.G0t
-    II, tmpnn, tmpNn, tmpNN, tmpNN_, ipiv =
-        SCEE.II, SCEE.nn, SCEE.Nn, SCEE.NN, SCEE.NN_, SCEE.ipiv
+    II, tmpnn, tmpnN, tmpNN, tmpNN_, ipiv =
+        SCEE.II, SCEE.nn, SCEE.nN, SCEE.NN, SCEE.NN_, SCEE.ipiv
 
-    get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,idx),view(BRMs,:,:,idx),Gt)
+    get_G!(tmpnn,tmpnN,ipiv,view(BLMs,:,:,idx),view(BRMs,:,:,idx),Gt)
     if idx==Θidx
         G0 .= Gt
         if direction=="Forward"
@@ -572,7 +571,7 @@ function G4!(SCEE::SCEEBuffer_,G::G4Buffer_,nodes::Vector{Int64},idx::Int64,dire
             G0t.= Gt
         end
     else
-        get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,Θidx),view(BRMs,:,:,Θidx),G0)
+        get_G!(tmpnn,tmpnN,ipiv,view(BLMs,:,:,Θidx),view(BRMs,:,:,Θidx),G0)
     
         Gt0 .= II
         G0t .= II
@@ -581,7 +580,7 @@ function G4!(SCEE::SCEEBuffer_,G::G4Buffer_,nodes::Vector{Int64},idx::Int64,dire
                 if j==idx
                     tmpNN_ .= Gt
                 else
-                    get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,j),view(BRMs,:,:,j),tmpNN_)
+                    get_G!(tmpnn,tmpnN,ipiv,view(BLMs,:,:,j),view(BRMs,:,:,j),tmpNN_)
                 end
                 mul!(tmpNN,tmpNN_, G0t)
                 mul!(G0t, view(BMs,:,:,j), tmpNN)
@@ -596,7 +595,7 @@ function G4!(SCEE::SCEEBuffer_,G::G4Buffer_,nodes::Vector{Int64},idx::Int64,dire
                 if j==Θidx
                     tmpNN_ .= G0
                 else
-                    get_G!(tmpnn,tmpNn,ipiv,view(BLMs,:,:,j),view(BRMs,:,:,j),tmpNN_)
+                    get_G!(tmpnn,tmpnN,ipiv,view(BLMs,:,:,j),view(BRMs,:,:,j),tmpNN_)
                 end
                 mul!(tmpNN, tmpNN_, Gt0)
                 mul!(Gt0, view(BMs,:,:,j), tmpNN)

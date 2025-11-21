@@ -9,10 +9,10 @@ function main()
     rng=MersenneTwister(time_ns())
 
     t=1;   Lattice="HoneyComb60"    
-    U=1;     Δt=0.05;     Θ=5.15;
+    U=1;     Δt=0.05;     Θ=2.15;
     BatchSize=5;
 
-    L=3
+    L=6
     site=[L,L]
 
     model=Hubbard_Para(t,U,Lattice,site,Δt,Θ,BatchSize,"H0")
@@ -38,7 +38,7 @@ function main()
     Nλ=2
     Sweeps=2
 
-    # ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
+    ss=ctrl_SCEEicr(path,model,indexA,indexB,Sweeps,λ,Nλ,ss,true)
 end
 
 main()
